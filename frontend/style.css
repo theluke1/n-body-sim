@@ -1,0 +1,224 @@
+/* ============================================================
+   N-Body Sim — Quasar Dark Theme
+   ============================================================ */
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:        #090910;
+  --panel-bg:  #0c1428;
+  --border:    #1e2d50;
+  --text:      #dde4f0;
+  --subtext:   #7a8aaa;
+  --gold:      #f5c518;
+  --gold-dim:  #b8960e;
+  --cyan:      #00b4e8;
+  --purple:    #9b59d4;
+  --teal:      #4caf82;
+  --blue:      #5588ff;
+  --red:       #ff5252;
+  --font:      'Segoe UI', system-ui, Arial, sans-serif;
+  --mono:      'Courier New', 'Consolas', monospace;
+  --radius:    6px;
+  --sidebar-w: 360px;
+}
+
+html, body {
+  height: 100%;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 13px;
+  overflow: hidden;
+}
+
+/* ── Layout ─────────────────────────────────────────────── */
+
+#app {
+  display: flex;
+  height: 100vh;
+  width: 100vw;
+}
+
+#canvas-wrap {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+  background: #000;
+}
+
+#sim-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+#sidebar {
+  width: var(--sidebar-w);
+  min-width: var(--sidebar-w);
+  background: #08090f;
+  border-left: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-bottom: 16px;
+}
+
+/* Hide scrollbar but keep scroll */
+#sidebar::-webkit-scrollbar { width: 4px; }
+#sidebar::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+/* ── Brand header ───────────────────────────────────────── */
+
+#brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 16px 12px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.brand-icon {
+  font-size: 20px;
+  color: var(--gold);
+}
+
+.brand-title {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 3px;
+  color: var(--gold);
+  text-transform: uppercase;
+}
+
+/* ── Panels ─────────────────────────────────────────────── */
+
+.panel {
+  background: var(--panel-bg);
+  border-top: 1px solid var(--border);
+  padding: 12px 16px;
+  flex-shrink: 0;
+}
+
+.panel h3 {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 2.5px;
+  text-transform: uppercase;
+  margin-bottom: 10px;
+}
+
+/* ── Color classes ──────────────────────────────────────── */
+
+.gold     { color: var(--gold); }
+.gold-dim { color: var(--gold-dim); }
+.cyan     { color: var(--cyan); }
+.purple   { color: var(--purple); }
+.teal     { color: var(--teal); }
+.blue     { color: var(--blue); }
+.red      { color: var(--red); }
+.dim      { color: var(--subtext); }
+.mono     { font-family: var(--mono); font-size: 11px; color: #aac8e8; }
+
+/* ── Buttons ────────────────────────────────────────────── */
+
+.btn-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-bottom: 10px;
+}
+
+.btn {
+  background: #101726;
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 5px 12px;
+  font-size: 11px;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+  white-space: nowrap;
+}
+
+.btn:hover   { background: #1e2d50; border-color: #3a5080; }
+.btn:active  { background: #243460; }
+
+.btn-gold  { border-color: var(--gold);   color: var(--gold);   }
+.btn-cyan  { border-color: var(--cyan);   color: var(--cyan);   }
+.btn-teal  { border-color: var(--teal);   color: var(--teal);   }
+.btn-red   { border-color: var(--red);    color: var(--red);    }
+
+.btn-gold:hover  { background: rgba(245,197,24,0.12); }
+.btn-cyan:hover  { background: rgba(0,180,232,0.12);  }
+.btn-teal:hover  { background: rgba(76,175,130,0.12); }
+.btn-red:hover   { background: rgba(255,82,82,0.12);  }
+
+.btn.active { opacity: 0.65; }
+
+/* ── Sliders / Labels ───────────────────────────────────── */
+
+label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--subtext);
+  margin-bottom: 7px;
+  font-size: 11px;
+}
+
+input[type="range"] {
+  flex: 1;
+  height: 3px;
+  accent-color: var(--cyan);
+  cursor: pointer;
+  min-width: 0;
+}
+
+.val {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--text);
+  min-width: 40px;
+  text-align: right;
+  flex-shrink: 0;
+}
+
+/* ── Charts panel ───────────────────────────────────────── */
+
+.panel-charts {
+  gap: 10px;
+  display: flex;
+  flex-direction: column;
+}
+
+.panel-charts canvas {
+  width: 100% !important;
+  border-radius: 4px;
+  background: #060810;
+}
+
+/* ── HUD overlay ────────────────────────────────────────── */
+
+#hud {
+  position: absolute;
+  top: 14px;
+  left: 14px;
+  pointer-events: none;
+  user-select: none;
+}
+
+#hud > div {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: rgba(170,200,232,0.85);
+  line-height: 1.7;
+  text-shadow: 0 1px 3px #000;
+}
+
+.status-running { color: #4caf82 !important; font-weight: 700; }
+.status-paused  { color: #f5c518 !important; font-weight: 700; }
+
+.hint { color: var(--subtext); font-size: 11px; margin-bottom: 6px; }
