@@ -7,14 +7,13 @@
   <link rel="stylesheet" href="/static/style.css" />
 </head>
 <body>
-  <!-- ─── Layout ────────────────────────────────────── -->
   <div id="app">
 
-    <!-- Left: 3-D canvas -->
+    <!-- ── Canvas + side panel ───────────────────────────── -->
     <div id="canvas-wrap">
       <canvas id="sim-canvas"></canvas>
 
-      <!-- Overlay HUD -->
+      <!-- HUD overlay (top-left) -->
       <div id="hud">
         <div id="hud-time">t = 0.000 yr</div>
         <div id="hud-bodies">Bodies: 0</div>
@@ -22,113 +21,135 @@
         <div id="hud-selected"></div>
         <div id="hud-status" class="status-paused">PAUSED</div>
       </div>
-    </div>
 
-    <!-- Right: control panel + charts -->
-    <aside id="sidebar">
+      <!-- Vertical tab strip — right edge of canvas -->
+      <div id="tab-strip">
+        <button class="tab-icon" id="tab-btn-data" title="Body Data">◉</button>
+        <button class="tab-icon" id="tab-btn-rec"  title="Recording">⏺</button>
+      </div>
 
-      <header id="brand">
-        <span class="brand-icon">⬡</span>
-        <span class="brand-title">N-BODY SIM</span>
-      </header>
+      <!-- Side panel — slides in over right portion of canvas -->
+      <div id="side-panel">
 
-      <!-- ── SIMULATION ── -->
-      <section class="panel">
-        <h3 class="gold">⬡ Simulation</h3>
-        <div class="btn-row">
-          <button id="btn-run" class="btn btn-gold" data-action="toggle_run">Run / Pause</button>
-          <button class="btn" data-action="reset">Reset</button>
-          <button class="btn" data-action="clear_photons">Clear Photons</button>
+        <!-- Panel sub-tab bar -->
+        <div id="panel-tabs">
+          <button class="ptab active" data-ptab="data">Data</button>
+          <button class="ptab"        data-ptab="rec">Record</button>
+          <button id="panel-close" title="Close">✕</button>
         </div>
-        <label>Time step dt
-          <input type="range" id="sl-dt" min="0.0001" max="0.005" step="0.0001" value="0.001" />
-          <span class="val" id="val-dt">0.0010</span>
-        </label>
-      </section>
 
-      <!-- ── BODIES ── -->
-      <section class="panel">
-        <h3 class="cyan">◉ Bodies</h3>
-        <label>Count (N)
-          <input type="range" id="sl-N" min="2" max="200" step="1" value="5" />
+        <!-- ── Data tab ── -->
+        <div id="ptab-data" class="ptab-content active">
+          <div id="sel-info" class="mono dim">Click a body to select it</div>
+
+          <div class="chart-block">
+            <div class="chart-label cyan">Orbital Path (x vs y)</div>
+            <canvas id="chart-orbit" height="140"></canvas>
+          </div>
+          <div class="chart-block">
+            <div class="chart-label" style="color:#c77dff">Phase Space (r vs speed)</div>
+            <canvas id="chart-phase" height="140"></canvas>
+          </div>
+          <div class="chart-block">
+            <div class="chart-label" style="color:#ff5252">Velocity Components</div>
+            <canvas id="chart-vel" height="120"></canvas>
+          </div>
+          <div class="chart-block">
+            <div class="chart-label teal">Kinetic Energy</div>
+            <canvas id="chart-ke" height="120"></canvas>
+          </div>
+        </div>
+
+        <!-- ── Recording tab ── -->
+        <div id="ptab-rec" class="ptab-content">
+          <div class="btn-row" style="margin-bottom:12px">
+            <button id="btn-rec" class="btn btn-teal" data-action="toggle_recording">Start Rec</button>
+            <button id="btn-csv" class="btn">Save CSV</button>
+          </div>
+          <label>Sample interval
+            <input type="range" id="sl-sample" min="1" max="120" step="1" value="30" />
+            <span class="val" id="val-sample">30</span>
+          </label>
+          <div id="rec-status" class="mono dim" style="margin-top:10px">Idle — 0 rows</div>
+        </div>
+
+      </div><!-- /side-panel -->
+    </div><!-- /canvas-wrap -->
+
+    <!-- ── Bottom controls strip ──────────────────────────── -->
+    <div id="controls">
+
+      <!-- Playback -->
+      <div class="ctrl-group">
+        <button id="btn-run"   class="btn btn-gold">Run</button>
+        <button                class="btn" data-action="reset">Reset</button>
+      </div>
+
+      <div class="ctrl-sep"></div>
+
+      <!-- Body params -->
+      <div class="ctrl-group">
+        <div class="ctrl-item">
+          <span class="ctrl-label cyan">N</span>
+          <input type="range" id="sl-N" min="2" max="50" step="1" value="5" />
           <span class="val" id="val-N">5</span>
-        </label>
-        <label>Spawn radius
-          <input type="range" id="sl-spawn" min="1" max="50" step="0.5" value="10" />
-          <span class="val" id="val-spawn">10.0</span>
-        </label>
-        <label>Mass min
-          <input type="range" id="sl-mmin" min="0.1" max="20" step="0.1" value="0.5" />
-          <span class="val" id="val-mmin">0.5</span>
-        </label>
-        <label>Mass max
-          <input type="range" id="sl-mmax" min="0.1" max="20" step="0.1" value="3.0" />
-          <span class="val" id="val-mmax">3.0</span>
-        </label>
-        <label>Velocity factor
+        </div>
+        <div class="ctrl-item">
+          <span class="ctrl-label">Velocity</span>
           <input type="range" id="sl-vfac" min="0" max="3" step="0.05" value="0.6" />
           <span class="val" id="val-vfac">0.60</span>
-        </label>
-      </section>
-
-      <!-- ── BLACK HOLE ── -->
-      <section class="panel">
-        <h3 class="purple">● Black Hole</h3>
-        <div class="btn-row">
-          <button id="btn-bh" class="btn" data-action="toggle_bh">Enable BH</button>
         </div>
-        <label>BH Mass
+        <div class="ctrl-item">
+          <span class="ctrl-label">Spawn R</span>
+          <input type="range" id="sl-spawn" min="1" max="50" step="0.5" value="10" />
+          <span class="val" id="val-spawn">10.0</span>
+        </div>
+        <div class="ctrl-item">
+          <span class="ctrl-label">M min</span>
+          <input type="range" id="sl-mmin" min="0.1" max="20" step="0.1" value="0.5" />
+          <span class="val" id="val-mmin">0.5</span>
+        </div>
+        <div class="ctrl-item">
+          <span class="ctrl-label">M max</span>
+          <input type="range" id="sl-mmax" min="0.1" max="20" step="0.1" value="3.0" />
+          <span class="val" id="val-mmax">3.0</span>
+        </div>
+        <div class="ctrl-item">
+          <span class="ctrl-label">dt</span>
+          <input type="range" id="sl-dt" min="0.0001" max="0.005" step="0.0001" value="0.001" />
+          <span class="val" id="val-dt">0.0010</span>
+        </div>
+      </div>
+
+      <div class="ctrl-sep"></div>
+
+      <!-- Black hole -->
+      <div class="ctrl-group">
+        <button id="btn-bh" class="btn" data-action="toggle_bh">Enable BH</button>
+        <div class="ctrl-item">
+          <span class="ctrl-label purple">BH Mass</span>
           <input type="range" id="sl-bhmass" min="10" max="5000" step="10" value="200" />
           <span class="val" id="val-bhmass">200</span>
-        </label>
-      </section>
-
-      <!-- ── PHOTONS ── -->
-      <section class="panel">
-        <h3 class="blue">✦ Photons</h3>
-        <div class="btn-row">
-          <button id="btn-photons" class="btn" data-action="toggle_photons">Enable Photons</button>
-          <button id="btn-flashlight" class="btn btn-cyan">Fire Flashlight</button>
         </div>
-      </section>
+      </div>
 
-      <!-- ── SELECTED BODY ── -->
-      <section class="panel">
-        <h3 class="gold-dim">◎ Selected Body</h3>
-        <p class="hint">Click a body in the viewport to select it.</p>
-        <div id="sel-info" class="mono">—</div>
-      </section>
+      <div class="ctrl-sep"></div>
 
-      <!-- ── DATA RECORDING ── -->
-      <section class="panel">
-        <h3 class="teal">⏺ Data Recording</h3>
-        <div class="btn-row">
-          <button id="btn-rec" class="btn btn-teal" data-action="toggle_recording">Start Rec</button>
-          <button id="btn-csv" class="btn" data-action="save_csv">Save CSV</button>
-        </div>
-        <label>Sample interval
-          <input type="range" id="sl-sample" min="1" max="120" step="1" value="30" />
-          <span class="val" id="val-sample">30</span>
-        </label>
-        <div id="rec-status" class="mono dim">Idle — 0 rows</div>
-      </section>
+      <!-- Photons -->
+      <div class="ctrl-group">
+        <button id="btn-photons"    class="btn"      data-action="toggle_photons">Photons Off</button>
+        <button id="btn-flashlight" class="btn btn-cyan">✦ Fire</button>
+        <button                     class="btn"      data-action="clear_photons">Clear</button>
+      </div>
 
-      <!-- ── CHARTS ── -->
-      <section class="panel panel-charts">
-        <h3 class="cyan">▲ Live Charts</h3>
-        <canvas id="chart-energy" height="100"></canvas>
-        <canvas id="chart-vel"    height="100"></canvas>
-      </section>
+    </div><!-- /controls -->
+  </div><!-- /app -->
 
-    </aside>
-  </div>
-
-  <!-- Three.js + Chart.js from CDN -->
   <script type="importmap">
   {
     "imports": {
-      "three": "https://cdn.jsdelivr.net/npm/three@0.163.0/build/three.module.js",
-      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.163.0/examples/jsm/"
+      "three":          "https://cdn.jsdelivr.net/npm/three@0.163.0/build/three.module.js",
+      "three/addons/":  "https://cdn.jsdelivr.net/npm/three@0.163.0/examples/jsm/"
     }
   }
   </script>
