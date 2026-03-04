@@ -1,201 +1,180 @@
 """
 N-Body Web Server
 =================
-FastAPI application that:
-  - Runs the physics simulation in a background thread
-  - Streams state to all connected WebSocket clients at ~30 fps
-  - Exposes REST endpoints to control the simulation
-  - Serves the static frontend (HTML/CSS/JS)
+Per-session architecture: each WebSocket connection gets its own
+isolated simulation that starts automatically and resets when the
+visitor's tab closes.
 
 Run locally:
     pip install -r requirements.txt
     uvicorn main:app --reload --port 8000
 
-Then open http://localhost:8000
+Deploy to Railway:
+    root dir = n-body-web/backend
+    start cmd = uvicorn main:app --host 0.0.0.0 --port $PORT
 """
 
 import asyncio
 import json
-import threading
 import time
-import os
+import threading
 from pathlib import Path
-from typing import Set
 
 import numpy as np
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
-from pydantic import BaseModel
 
 from simulation import NBodySimulation, SimulationConfig
 
-# ============================================================
-# App & simulation setup
-# ============================================================
-
 app = FastAPI(title="N-Body Sim")
 
-config = SimulationConfig()
-sim = NBodySimulation(config)
-sim.generate_bodies(config.N_target)
-
-# WebSocket connection pool
-_clients: Set[WebSocket] = set()
-_clients_lock = asyncio.Lock()
+PHYSICS_HZ  = 200          # physics steps per second
+BROADCAST_HZ = 30          # WebSocket frames per second
 
 # ============================================================
-# Physics loop (runs in a background thread)
+# Per-session simulation runner
 # ============================================================
 
-# How many physics steps per second. Independent of broadcast rate.
-PHYSICS_HZ = 200
-_physics_dt = 1.0 / PHYSICS_HZ
+class Session:
+    """
+    One physics simulation per WebSocket connection.
+    Physics runs in a background thread; state is broadcast from
+    an asyncio task on the main event loop.
+    """
 
-def _physics_loop():
-    while True:
-        t0 = time.perf_counter()
-        if sim.running:
-            sim.timestep()
-            sim.update_photons()
-        elapsed = time.perf_counter() - t0
-        sleep_for = _physics_dt - elapsed
-        if sleep_for > 0:
-            time.sleep(sleep_for)
+    def __init__(self):
+        self.config = SimulationConfig()
+        self.sim = NBodySimulation(self.config)
+        self.sim.generate_bodies(self.config.N_target)
+        self._stop = threading.Event()
+        self._thread = threading.Thread(target=self._physics_loop, daemon=True)
+        self._thread.start()
 
-threading.Thread(target=_physics_loop, daemon=True).start()
+    def _physics_loop(self):
+        interval = 1.0 / PHYSICS_HZ
+        while not self._stop.is_set():
+            t0 = time.perf_counter()
+            if self.sim.running:
+                self.sim.timestep()
+                self.sim.update_photons()
+                # Auto-reset if all bodies gone (keeps the demo alive)
+                if len(self.sim.bodies) == 0:
+                    self.sim.clear_photons()
+                    self.sim.generate_bodies(self.config.N_target)
+            elapsed = time.perf_counter() - t0
+            wait = interval - elapsed
+            if wait > 0:
+                time.sleep(wait)
+
+    def stop(self):
+        self._stop.set()
+
+    def handle_message(self, msg: dict):
+        action = msg.get("action")
+        v = msg.get("value", 0)
+        sim = self.sim
+        cfg = self.config
+
+        if action == "toggle_run":
+            sim.running = not sim.running
+        elif action == "reset":
+            was = sim.running
+            sim.running = False
+            sim.clear_bodies()
+            sim.clear_photons()
+            sim.recorder.clear()
+            sim.sim_time = 0.0
+            sim.generate_bodies(cfg.N_target)
+            sim.running = was
+        elif action == "clear_photons":
+            sim.clear_photons()
+        elif action == "toggle_bh":
+            sim.toggle_black_hole()
+        elif action == "toggle_photons":
+            sim.photons_on = not sim.photons_on
+        elif action == "set_dt":
+            cfg.dt = max(1e-4, min(1e-2, float(v)))
+        elif action == "set_N":
+            n = max(2, min(200, int(v)))
+            cfg.N_target = n
+            was = sim.running
+            sim.running = False
+            sim.generate_bodies(n)
+            sim.running = was
+        elif action == "set_spawn_radius":
+            cfg.spawn_radius = max(1.0, min(50.0, float(v)))
+        elif action == "set_mass_min":
+            cfg.mass_min = max(0.1, min(cfg.mass_max - 0.1, float(v)))
+        elif action == "set_mass_max":
+            cfg.mass_max = max(cfg.mass_min + 0.1, min(50.0, float(v)))
+        elif action == "set_vel_factor":
+            cfg.vel_factor = max(0.0, min(3.0, float(v)))
+        elif action == "set_bh_mass":
+            cfg.central_mass = max(10.0, min(5000.0, float(v)))
+            if sim.black_hole:
+                sim.black_hole.update_mass(cfg.central_mass)
+        elif action == "toggle_recording":
+            sim.recorder.recording = not sim.recorder.recording
+        elif action == "save_csv":
+            return sim.recorder.save_csv()
+        elif action == "set_sample_interval":
+            sim.recorder.sample_interval = max(1, min(300, int(v)))
+        elif action == "set_selected":
+            idx = int(msg.get("index", 0))
+            if 0 <= idx < len(sim.bodies):
+                sim.selected_index = idx
+        elif action == "spawn_photons":
+            cam = np.array(msg.get("camera_pos", [20, 0, 0]), dtype=float)
+            fwd = np.array(msg.get("camera_dir", [-1, 0, 0]), dtype=float)
+            sim.spawn_photons(cam, fwd)
+        return None
+
 
 # ============================================================
-# WebSocket broadcast loop (runs in asyncio event loop)
-# ============================================================
-
-BROADCAST_HZ = 30
-_broadcast_interval = 1.0 / BROADCAST_HZ
-
-
-async def _broadcast_loop():
-    while True:
-        await asyncio.sleep(_broadcast_interval)
-        if not _clients:
-            continue
-        state = sim.get_state()
-        payload = json.dumps({"type": "state", "data": state})
-        dead = set()
-        async with _clients_lock:
-            for ws in _clients:
-                try:
-                    await ws.send_text(payload)
-                except Exception:
-                    dead.add(ws)
-            _clients.difference_update(dead)
-
-
-@app.on_event("startup")
-async def _startup():
-    asyncio.create_task(_broadcast_loop())
-
-# ============================================================
-# WebSocket endpoint
+# WebSocket endpoint — one session per connection
 # ============================================================
 
 @app.websocket("/ws")
 async def websocket_endpoint(ws: WebSocket):
     await ws.accept()
-    async with _clients_lock:
-        _clients.add(ws)
-    # Send initial state immediately
-    await ws.send_text(json.dumps({"type": "state", "data": sim.get_state()}))
+    session = Session()
+    interval = 1.0 / BROADCAST_HZ
+
+    # Broadcast task: runs concurrently while we also listen for messages
+    async def broadcast():
+        while True:
+            state = session.sim.get_state()
+            await ws.send_text(json.dumps({"type": "state", "data": state}))
+            await asyncio.sleep(interval)
+
+    broadcast_task = asyncio.create_task(broadcast())
+
     try:
-        async for message in ws.iter_text():
-            _handle_ws_message(json.loads(message))
+        async for raw in ws.iter_text():
+            msg = json.loads(raw)
+            result = session.handle_message(msg)
+            # If save_csv, echo the filename back
+            if msg.get("action") == "save_csv" and result:
+                await ws.send_text(json.dumps({"type": "csv_saved", "filename": result}))
     except WebSocketDisconnect:
         pass
     finally:
-        async with _clients_lock:
-            _clients.discard(ws)
-
-
-def _handle_ws_message(msg: dict):
-    """Process control messages sent from the browser over WS."""
-    action = msg.get("action")
-    if action == "set_selected":
-        idx = msg.get("index", 0)
-        if 0 <= idx < len(sim.bodies):
-            sim.selected_index = idx
-    elif action == "spawn_photons":
-        cam = np.array(msg.get("camera_pos", [20, 0, 0]), dtype=float)
-        fwd = np.array(msg.get("camera_dir", [-1, 0, 0]), dtype=float)
-        sim.spawn_photons(cam, fwd)
+        broadcast_task.cancel()
+        session.stop()
 
 
 # ============================================================
-# REST control endpoints
+# Health-check (used by Railway / uptime monitors)
 # ============================================================
 
-class ControlPayload(BaseModel):
-    action: str
-    value: float = 0.0
+@app.get("/health")
+def health():
+    return {"status": "ok"}
 
-
-@app.post("/control")
-def control(payload: ControlPayload):
-    a = payload.action
-    v = payload.value
-
-    if a == "toggle_run":
-        sim.running = not sim.running
-    elif a == "reset":
-        was = sim.running
-        sim.running = False
-        sim.clear_bodies()
-        sim.recorder.clear()
-        sim.sim_time = 0.0
-        sim.generate_bodies(config.N_target)
-        sim.running = was
-    elif a == "clear_photons":
-        sim.clear_photons()
-    elif a == "toggle_bh":
-        sim.toggle_black_hole()
-    elif a == "toggle_photons":
-        sim.photons_on = not sim.photons_on
-    elif a == "set_dt":
-        config.dt = max(1e-4, min(1e-2, v))
-    elif a == "set_N":
-        n = max(2, min(200, int(v)))
-        config.N_target = n
-        was = sim.running
-        sim.running = False
-        sim.generate_bodies(n)
-        sim.running = was
-    elif a == "set_spawn_radius":
-        config.spawn_radius = max(1.0, min(50.0, v))
-    elif a == "set_mass_min":
-        config.mass_min = max(0.1, min(config.mass_max - 0.1, v))
-    elif a == "set_mass_max":
-        config.mass_max = max(config.mass_min + 0.1, min(50.0, v))
-    elif a == "set_vel_factor":
-        config.vel_factor = max(0.0, min(3.0, v))
-    elif a == "set_bh_mass":
-        config.central_mass = max(10.0, min(5000.0, v))
-        if sim.black_hole:
-            sim.black_hole.update_mass(config.central_mass)
-    elif a == "toggle_recording":
-        sim.recorder.recording = not sim.recorder.recording
-    elif a == "save_csv":
-        filename = sim.recorder.save_csv()
-        return {"ok": True, "filename": filename}
-    elif a == "set_sample_interval":
-        sim.recorder.sample_interval = max(1, min(300, int(v)))
-
-    return {"ok": True, "running": sim.running}
-
-
-@app.get("/state")
-def get_state():
-    return sim.get_state()
 
 # ============================================================
-# Static files (serve frontend)
+# Static files
 # ============================================================
 
 FRONTEND_DIR = Path(__file__).parent.parent / "frontend"
