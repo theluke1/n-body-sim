@@ -18,7 +18,7 @@
   --font:      'Segoe UI', system-ui, Arial, sans-serif;
   --mono:      'Courier New', 'Consolas', monospace;
   --radius:    6px;
-  --ctrl-h:    96px;       /* height of the bottom control strip */
+  --ctrl-h:    56px;       /* height of the bottom control strip */
   --tab-w:     42px;       /* width of the vertical tab strip    */
   --panel-w:   310px;      /* width of the slide-in data panel   */
 }
@@ -222,59 +222,56 @@ html, body {
 /* ── Bottom controls strip ───────────────────────────────── */
 
 #controls {
-  height: var(--ctrl-h);
+  height: 56px;
   flex-shrink: 0;
   background: #07080e;
   border-top: 1px solid var(--border);
   display: flex;
   align-items: center;
-  gap: 0;
+  gap: 4px;
   overflow-x: auto;
   overflow-y: hidden;
-  padding: 0 10px;
+  padding: 0 14px;
   scrollbar-width: thin;
   scrollbar-color: var(--border) transparent;
+  width: 100%;
 }
 
 #controls::-webkit-scrollbar { height: 3px; }
 #controls::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
 
-/* Control groups — vertical stack inside the strip */
 .ctrl-group {
   display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 6px;
-  padding: 0 12px;
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
   flex-shrink: 0;
 }
-
-/* Horizontal within a group (for multiple items on one row) */
-.ctrl-group > .btn { align-self: stretch; }
 
 .ctrl-sep {
   width: 1px;
-  height: 60px;
+  height: 28px;
   background: var(--border);
   flex-shrink: 0;
+  margin: 0 4px;
 }
 
+/* Each slider row: label · slider · value */
 .ctrl-item {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 5px;
   white-space: nowrap;
 }
 
 .ctrl-label {
   font-size: 10px;
   color: var(--subtext);
-  min-width: 46px;
-  text-align: right;
+  white-space: nowrap;
 }
 
 input[type="range"] {
-  width: 110px;
+  width: 80px;
   height: 3px;
   accent-color: var(--cyan);
   cursor: pointer;
@@ -284,7 +281,7 @@ input[type="range"] {
   font-family: var(--mono);
   font-size: 10px;
   color: var(--text);
-  min-width: 36px;
+  min-width: 30px;
 }
 
 /* ── Buttons ─────────────────────────────────────────────── */
