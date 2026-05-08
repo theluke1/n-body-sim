@@ -1,0 +1,248 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ── Mission Control Color Palette ─────────────────────────── */
+:root {
+  --bg:          #03040a;
+  --bg-panel:    rgba(5, 9, 20, 0.82);
+  --bg-panel-2:  rgba(10, 17, 34, 0.72);
+  --border:      rgba(97, 149, 226, 0.16);
+  --border-bright: rgba(111, 178, 255, 0.38);
+
+  --text:        #e0e8ff;
+  --text-dim:    #70809d;
+  --text-mono:   #a9c8ee;
+
+  --cyan:        #00d4ff;
+  --green:       #00e878;
+  --amber:       #f5a020;
+  --red:         #ff3d5a;
+  --purple:      #b86dff;
+  --gold:        #f5c518;
+  --blue-light:  #60a5fa;
+
+  --font-mono: 'Space Mono', 'Courier New', monospace;
+  --font-ui:   'Inter', system-ui, sans-serif;
+  --radius:    6px;
+}
+
+/* ── Base Reset ─────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body, #root {
+  height: 100%;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-ui);
+  font-size: 16px;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: geometricPrecision;
+}
+
+/* ── Scrollbars ─────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 3px; height: 3px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border-bright); border-radius: 2px; }
+
+/* ── Animations ─────────────────────────────────────────────── */
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1;   box-shadow: 0 0 6px 2px currentColor; }
+  50%       { opacity: 0.5; box-shadow: 0 0 2px 0px currentColor; }
+}
+@keyframes data-flash {
+  0%   { opacity: 1; }
+  50%  { opacity: 0.4; }
+  100% { opacity: 1; }
+}
+@keyframes scan {
+  0%   { transform: translateY(-100%); }
+  100% { transform: translateY(100vh); }
+}
+@keyframes subtle-glow {
+  0%, 100% { filter: saturate(1) brightness(1); }
+  50%      { filter: saturate(1.2) brightness(1.06); }
+}
+
+.pulse { animation: pulse-dot 2.4s ease-in-out infinite; }
+.flash { animation: data-flash 0.3s ease-out; }
+
+/* ── Scanline overlay ───────────────────────────────────────── */
+.scanlines {
+  position: relative;
+}
+.scanlines::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 3px,
+    rgba(0, 0, 0, 0.04) 3px,
+    rgba(0, 0, 0, 0.04) 4px
+  );
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* ── Panel base ─────────────────────────────────────────────── */
+.mc-panel {
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  backdrop-filter: blur(18px) saturate(1.25);
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.26);
+}
+
+/* ── Buttons ────────────────────────────────────────────────── */
+.mc-btn {
+  background: var(--bg-panel-2);
+  color: var(--text-dim);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 7px 14px;
+  font-family: var(--font-mono);
+  font-size: 14px;
+  letter-spacing: 1px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: transform 0.16s ease, background 0.16s ease, border-color 0.16s ease, color 0.16s ease, box-shadow 0.16s ease;
+  text-transform: uppercase;
+}
+.mc-btn:hover {
+  background: rgba(31, 48, 82, 0.78);
+  color: var(--text);
+  border-color: var(--border-bright);
+  transform: translateY(-1px);
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.22);
+}
+.mc-btn:active { transform: translateY(0); }
+
+.mc-btn-red    { border-color: var(--red);    color: var(--red);    }
+.mc-btn-cyan   { border-color: var(--cyan);   color: var(--cyan);   }
+.mc-btn-green  { border-color: var(--green);  color: var(--green);  }
+.mc-btn-amber  { border-color: var(--amber);  color: var(--amber);  }
+.mc-btn-purple { border-color: var(--purple); color: var(--purple); }
+
+.mc-btn-red:hover    { background: rgba(255,61,90,0.12);   }
+.mc-btn-cyan:hover   { background: rgba(0,212,255,0.10);   }
+.mc-btn-green:hover  { background: rgba(0,232,120,0.10);   }
+.mc-btn-amber:hover  { background: rgba(245,160,32,0.12);  }
+.mc-btn-purple:hover { background: rgba(184,109,255,0.12); }
+
+.mc-btn-active-red    { background: rgba(255,61,90,0.18) !important;   }
+.mc-btn-active-cyan   { background: rgba(0,212,255,0.15) !important;   }
+.mc-btn-active-green  { background: rgba(0,232,120,0.15) !important;   }
+.mc-btn-active-amber  { background: rgba(245,160,32,0.15) !important;  }
+
+/* ── Range sliders ──────────────────────────────────────────── */
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 4px;
+  background: linear-gradient(90deg, currentColor 0%, var(--border-bright) 0%);
+  border-radius: 99px;
+  outline: none;
+  cursor: pointer;
+  width: 80px;
+}
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 13px; height: 13px;
+  border-radius: 50%;
+  background: currentColor;
+  box-shadow: 0 0 7px currentColor;
+  cursor: pointer;
+}
+input[type="range"]::-moz-range-thumb {
+  width: 13px; height: 13px;
+  border-radius: 50%;
+  background: currentColor;
+  box-shadow: 0 0 7px currentColor;
+  border: none;
+  cursor: pointer;
+}
+
+/* ── Section label ──────────────────────────────────────────── */
+.mc-label {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+
+/* ── Mono value display ─────────────────────────────────────── */
+.mc-value {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--text-mono);
+  min-width: 44px;
+  text-align: right;
+}
+
+/* ── Toggle switch ──────────────────────────────────────────── */
+.mc-toggle {
+  position: relative;
+  width: 32px; height: 16px;
+  cursor: pointer;
+}
+.mc-toggle input { opacity: 0; width: 0; height: 0; }
+.mc-toggle-track {
+  position: absolute; inset: 0;
+  background: var(--border);
+  border-radius: 8px;
+  transition: background 0.2s ease, box-shadow 0.2s ease;
+}
+.mc-toggle input:checked + .mc-toggle-track { background: var(--cyan); box-shadow: 0 0 16px rgba(0,212,255,0.24); }
+.mc-toggle-thumb {
+  position: absolute;
+  top: 2px; left: 2px;
+  width: 12px; height: 12px;
+  background: var(--text-dim);
+  border-radius: 50%;
+  transition: transform 0.2s, background 0.2s;
+  pointer-events: none;
+}
+.mc-toggle input:checked ~ .mc-toggle-thumb {
+  transform: translateX(16px);
+  background: #fff;
+  box-shadow: 0 0 6px var(--cyan);
+}
+
+/* ── Chart container ────────────────────────────────────────── */
+.chart-wrap {
+  background: #02030a;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  position: relative;
+}
+
+/* ── Performance bar ────────────────────────────────────────── */
+.perf-bar-track {
+  height: 3px;
+  background: var(--border);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.perf-bar-fill {
+  height: 100%;
+  border-radius: 2px;
+  transition: width 0.5s ease;
+}
+
+canvas {
+  cursor: grab;
+}
+canvas:active {
+  cursor: grabbing;
+}
+
+/* ── Glow text helpers ──────────────────────────────────────── */
+.glow-cyan   { text-shadow: 0 0 10px var(--cyan); }
+.glow-green  { text-shadow: 0 0 10px var(--green); }
+.glow-amber  { text-shadow: 0 0 10px var(--amber); }
+.glow-red    { text-shadow: 0 0 10px var(--red); }
+.glow-purple { text-shadow: 0 0 10px var(--purple); }
