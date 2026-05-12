@@ -586,9 +586,170 @@ function makeSchwarzschildLensPass(cubeRT: THREE.WebGLCubeRenderTarget, cinemati
   });
 }
 
+// ── Trail / body shader — funnel displacement ────────────────────────────────
+// Trails store raw world-space positions. This ShaderMaterial displaces each
+// vertex downward by the same gravitational-well formula as the grid, so trail
+// lines physically curve into the BH funnel without re-writing the position
+// buffer. All trail materials share the SAME four BH uniform objects — updating
+// bhFunnelUniforms once per frame propagates to every trail automatically.
+type BHFunnelUniforms = {
+  uBHPos:       { value: THREE.Vector3 };
+  uBHPresence:  { value: number };
+  uFunnelRS:    { value: number };
+  uFunnelScale: { value: number };
+};
+
+function makeTrailMaterial(bhu: BHFunnelUniforms): THREE.ShaderMaterial {
+  return new THREE.ShaderMaterial({
+    transparent: true,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+    uniforms: {
+      // shared references — mutating bhu.*.value updates all trail materials
+      uBHPos:       bhu.uBHPos,
+      uBHPresence:  bhu.uBHPresence,
+      uFunnelRS:    bhu.uFunnelRS,
+      uFunnelScale: bhu.uFunnelScale,
+      // per-trail
+      uColor:   { value: new THREE.Color(0x7ab8ff) },
+      uOpacity: { value: 0.72 },
+    },
+    vertexShader: /* glsl */`
+      uniform vec3  uBHPos;
+      uniform float uBHPresence;
+      uniform float uFunnelRS;
+      uniform float uFunnelScale;
+      void main() {
+        vec3  pos  = position;
+        vec2  diff = vec2(pos.x - uBHPos.x, pos.z - uBHPos.z);
+        float r    = length(diff);
+        float rFlat = uFunnelRS * 5.0;
+        float rSafe = max(r, uFunnelRS);
+        float depth = uFunnelScale * max(1.0 / rSafe - 1.0 / rFlat, 0.0);
+        pos.y -= depth * uBHPresence;
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
+      }
+    `,
+    fragmentShader: /* glsl */`
+      uniform vec3  uColor;
+      uniform float uOpacity;
+      void main() {
+        gl_FragColor = vec4(uColor, uOpacity);
+      }
+    `,
+  });
+}
+
+// ── Glowing spacetime grid ────────────────────────────────────────────────────
+// Each grid line is subdivided into SEGS segments so the vertex shader can
+// physically displace vertices downward into a gravitational well when a black
+// hole is present. The resulting funnel is visible from any non-top-down angle.
+// The Schwarzschild lensing ShaderPass then additionally warps the rendered
+// pixels — so lines near the BH are both geometrically bent AND optically
+// distorted, stacking both effects.
+function makeGlowGrid(size: number, divisions: number): { mesh: THREE.LineSegments; material: THREE.ShaderMaterial } {
+  const SEGS = 80; // subdivisions per line — controls funnel smoothness
+  const step = size / divisions;
+  const half = size / 2;
+  const positions: number[] = [];
+
+  // X-parallel lines (constant z, subdivided along x)
+  for (let i = 0; i <= divisions; i++) {
+    const z = -half + i * step;
+    for (let j = 0; j < SEGS; j++) {
+      const x0 = -half + (j / SEGS) * size;
+      const x1 = -half + ((j + 1) / SEGS) * size;
+      positions.push(x0, 0, z,  x1, 0, z);
+    }
+  }
+  // Z-parallel lines (constant x, subdivided along z)
+  for (let i = 0; i <= divisions; i++) {
+    const x = -half + i * step;
+    for (let j = 0; j < SEGS; j++) {
+      const z0 = -half + (j / SEGS) * size;
+      const z1 = -half + ((j + 1) / SEGS) * size;
+      positions.push(x, 0, z0,  x, 0, z1);
+    }
+  }
+
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(positions), 3));
+
+  const mat = new THREE.ShaderMaterial({
+    transparent: true,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+    uniforms: {
+      uTime:        { value: 0 },
+      uBHPos:       { value: new THREE.Vector3() },
+      uBHPresence:  { value: 0.0 },  // smooth 0→1 driven by render loop
+      uFunnelRS:    { value: 1.0 },  // BH Schwarzschild-equivalent radius (AU)
+      uFunnelScale: { value: 6.0 },  // depth multiplier
+    },
+    vertexShader: /* glsl */`
+      uniform vec3  uBHPos;
+      uniform float uBHPresence;
+      uniform float uFunnelRS;
+      uniform float uFunnelScale;
+      varying float vDistToBH;
+      varying float vBend;
+      void main() {
+        vec3  pos  = position;
+        vec2  diff = vec2(pos.x - uBHPos.x, pos.z - uBHPos.z);
+        float r    = length(diff);
+        vDistToBH  = r;
+
+        // Gravitational well: depth = A*(1/r - 1/rFlat)
+        // rFlat scales with the throat so the funnel always spans the same
+        // number of throat-radii regardless of BH mass — prevents large BH
+        // masses from pushing rFlat inside the grid and killing the effect.
+        float rSafe = max(r, uFunnelRS);
+        float rFlat = uFunnelRS * 5.0;
+        float depth = uFunnelScale * max(1.0 / rSafe - 1.0 / rFlat, 0.0);
+        pos.y -= depth * uBHPresence;
+        vBend = depth * uBHPresence;
+
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
+      }
+    `,
+    fragmentShader: /* glsl */`
+      uniform float uTime;
+      uniform float uBHPresence;
+      varying float vDistToBH;
+      varying float vBend;
+      void main() {
+        // Base: visible blue, always present when grid is on
+        vec3  baseColor = vec3(0.10, 0.25, 0.65);
+        float baseAlpha = 0.80;
+
+        // Proximity glow — brighten lines within ~22 AU of BH
+        float proximity = 1.0 - smoothstep(0.0, 22.0, vDistToBH);
+
+        // Outward pulse wave emanating from BH
+        float wave  = sin(vDistToBH * 1.6 - uTime * 2.2) * 0.5 + 0.5;
+        float pulse = wave * smoothstep(35.0, 0.0, vDistToBH);
+
+        // Bent lines glow brighter — highlights the well geometry
+        float bendGlow = min(vBend * 0.25, 1.0);
+
+        vec3  glowColor = vec3(0.15, 0.55, 1.00);
+        vec3  color = mix(baseColor, glowColor,
+                          uBHPresence * (proximity * 0.8 + pulse * 0.4 + bendGlow * 0.6));
+        float alpha = mix(baseAlpha,
+                          min(baseAlpha + 0.6 * proximity + 0.18 * pulse + bendGlow * 0.4, 1.0),
+                          uBHPresence);
+        gl_FragColor = vec4(color, alpha);
+      }
+    `,
+  });
+
+  return { mesh: new THREE.LineSegments(geo, mat), material: mat };
+}
+
 export default function SimCanvas({ stateRef, onSelectBody, onSpawnPhotons, showGrid, showTrails, bloomOn, onCaptureFrame }: Props) {
   const canvasRef   = useRef<HTMLCanvasElement>(null);
-  const gridRef     = useRef<THREE.GridHelper | null>(null);
+  const gridRef     = useRef<THREE.Object3D | null>(null);
+  const gridMatRef  = useRef<THREE.ShaderMaterial | null>(null);
   const trailMapRef = useRef(new Map<number, { line: THREE.Line; buf: Float32Array; len: number }>());
   const photonMapRef= useRef(new Map<number, THREE.Line>());
 
@@ -668,10 +829,11 @@ export default function SimCanvas({ stateRef, onSelectBody, onSpawnPhotons, show
     scene.add(buildStarfield());
 
     // ── Reference grid ──────────────────────────────────────
-    const grid = new THREE.GridHelper(100, 50, 0x091428, 0x060e1e);
+    const { mesh: grid, material: gridMat } = makeGlowGrid(100, 50);
     grid.visible = showGridRef.current;
     scene.add(grid);
-    gridRef.current = grid;
+    gridRef.current  = grid;
+    gridMatRef.current = gridMat;
 
     // ── PBR environment (PMREM from RoomEnvironment) ────────
     // PMREM (Pre-filtered Mipmapped Radiance Environment, Karis 2013) turns
@@ -839,7 +1001,9 @@ export default function SimCanvas({ stateRef, onSelectBody, onSpawnPhotons, show
     let bhDiskInner    = 0.4;
     let bhDiskOuter    = 3.0;
     let bhShadowRadius = 0;
-    let cubeTick = 0;
+    let cubeTick       = 0;
+    // Smooth 0→1 presence value — drives grid glow and body/trail dimming
+    let bhPresence     = 0.0;
 
     // ── Resize observer ─────────────────────────────────────
     const prevSize = new THREE.Vector2();
@@ -895,19 +1059,22 @@ export default function SimCanvas({ stateRef, onSelectBody, onSpawnPhotons, show
     const trailMap  = trailMapRef.current;
     const photonMap = photonMapRef.current;
 
+    // Shared BH funnel uniforms for all trail materials — updated once per
+    // frame so every trail gets the displacement without per-material loops.
+    const bhFunnelUniforms: BHFunnelUniforms = {
+      uBHPos:       { value: new THREE.Vector3() },
+      uBHPresence:  { value: 0.0 },
+      uFunnelRS:    { value: 1.0 },
+      uFunnelScale: { value: 6.0 },
+    };
+
     function getTrail(id: number): { line: THREE.Line; buf: Float32Array; len: number } {
       if (trailMap.has(id)) return trailMap.get(id)!;
       const buf  = new Float32Array(MAX_TRAIL_PTS * 3);
       const geo  = new THREE.BufferGeometry();
       geo.setAttribute('position', new THREE.BufferAttribute(buf, 3));
       geo.setDrawRange(0, 0);
-      const line = new THREE.Line(geo, new THREE.LineBasicMaterial({
-        color: 0x7ab8ff,
-        transparent: true,
-        opacity: 0.72,
-        blending: THREE.AdditiveBlending,
-        depthWrite: false,
-      }));
+      const line = new THREE.Line(geo, makeTrailMaterial(bhFunnelUniforms));
       scene.add(line);
       const entry = { line, buf, len: 0 };
       trailMap.set(id, entry);
@@ -933,18 +1100,56 @@ export default function SimCanvas({ stateRef, onSelectBody, onSpawnPhotons, show
       const trailLimit = highBodyCount ? 70 : bodies.length;
       const updateTrailFrame = !highBodyCount || frame % 3 === 0;
 
+      // Smooth BH presence transition (0 = no BH, 1 = fully active)
+      bhPresence += ((bh ? 1.0 : 0.0) - bhPresence) * 0.05;
+
+      // Dim bodies and trails when the BH is on — lets the lensing / accretion
+      // disk read clearly without competing brightness from point sprites/trails
+      const bodyDim    = 1.0 - bhPresence * 0.55;
+      const trailAlpha = 0.72 * (1.0 - bhPresence * 0.65);
+
+      // Funnel parameters — capping visualRS keeps the well visible even for
+      // very massive BHs whose shadow_radius would otherwise exceed the grid.
+      // With rFlat = visualRS*5 the max funnel depth is always scale*(1 - 1/5)
+      // = scale*0.8, independent of BH mass. A cap of 18 AU leaves room for
+      // the funnel to spread across the 100-AU grid without clipping at the edges.
+      const rawRS       = bh ? (bh.shadow_radius ?? (bh.event_horizon_radius ?? bh.radius) * 2.598076) : 1.0;
+      const visualRS    = Math.min(rawRS, 18.0);
+      const funnelScale = visualRS * 12.0;
+      const bhX         = bh ? bh.pos[0] : 0;
+      const bhZ         = bh ? bh.pos[2] : 0;
+
+      // Update grid + trail shared funnel uniforms
+      if (gridMatRef.current) {
+        const gu = gridMatRef.current.uniforms;
+        gu.uTime.value        = elapsed;
+        gu.uBHPresence.value  = bhPresence;
+        gu.uFunnelRS.value    = visualRS;
+        gu.uFunnelScale.value = funnelScale;
+        if (bh) gu.uBHPos.value.set(bh.pos[0], bh.pos[1], bh.pos[2]);
+      }
+      bhFunnelUniforms.uBHPresence.value  = bhPresence;
+      bhFunnelUniforms.uFunnelRS.value    = visualRS;
+      bhFunnelUniforms.uFunnelScale.value = funnelScale;
+      if (bh) bhFunnelUniforms.uBHPos.value.set(bh.pos[0], bh.pos[1], bh.pos[2]);
+
       // -- Bodies --
       const n = Math.min(bodies.length, MAX_BODIES);
       bodyGeo.setDrawRange(0, n);
       for (let i = 0; i < n; i++) {
-        const b = bodies[i];
+        const b  = bodies[i];
+        const dx = b.pos[0] - bhX;
+        const dz = b.pos[2] - bhZ;
+        const r  = Math.sqrt(dx * dx + dz * dz);
+        const rS = Math.max(r, visualRS);
+        const dip = funnelScale * Math.max(1.0 / rS - 1.0 / (visualRS * 5.0), 0.0) * bhPresence;
         bodyPos[i * 3]     = b.pos[0];
-        bodyPos[i * 3 + 1] = b.pos[1];
+        bodyPos[i * 3 + 1] = b.pos[1] - dip;
         bodyPos[i * 3 + 2] = b.pos[2];
         resolveBodyColor(col, b.mass, b.color);
-        bodyCol[i * 3]     = Math.min(col.r * 1.3, 1);
-        bodyCol[i * 3 + 1] = Math.min(col.g * 1.3, 1);
-        bodyCol[i * 3 + 2] = Math.min(col.b * 1.3, 1);
+        bodyCol[i * 3]     = Math.min(col.r * 1.3 * bodyDim, 1);
+        bodyCol[i * 3 + 1] = Math.min(col.g * 1.3 * bodyDim, 1);
+        bodyCol[i * 3 + 2] = Math.min(col.b * 1.3 * bodyDim, 1);
       }
       (bodyGeo.attributes.position as THREE.BufferAttribute).needsUpdate = true;
       (bodyGeo.attributes.color as THREE.BufferAttribute).needsUpdate = true;
@@ -1002,9 +1207,10 @@ export default function SimCanvas({ stateRef, onSelectBody, onSpawnPhotons, show
         }
         (line.geometry.attributes.position as THREE.BufferAttribute).needsUpdate = true;
         line.geometry.setDrawRange(0, entry.len);
-        const lm = line.material as THREE.LineBasicMaterial;
-        resolveBodyColor(lm.color, b.mass, b.color);
-        lm.color.multiplyScalar(1.25);
+        const sm = line.material as THREE.ShaderMaterial;
+        resolveBodyColor(col, b.mass, b.color);
+        sm.uniforms.uColor.value.copy(col).multiplyScalar(1.25);
+        sm.uniforms.uOpacity.value = trailAlpha;
       }
 
       // -- Black hole --
