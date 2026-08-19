@@ -1,0 +1,1171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gravity Lens Lab — Technical Case Study</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css"
+        crossorigin="anonymous">
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"
+          crossorigin="anonymous"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"
+          crossorigin="anonymous"
+          onload="renderMathInElement(document.body, {
+            delimiters: [
+              {left: '$$', right: '$$', display: true},
+              {left: '\\(', right: '\\)', display: false},
+              {left: '$', right: '$', display: false}
+            ],
+            throwOnError: false
+          })">
+  </script>
+  <style>
+    :root {
+      --bg:      #08090f;
+      --surface: #0d0e1a;
+      --surf2:   #12142a;
+      --border:  #2a2d3e;
+      --text:    #ccddee;
+      --sub:     #8899aa;
+      --green:   #4caf82;
+      --blue:    #4c9fff;
+      --amber:   #e8a838;
+      --red:     #e05555;
+      --font:    'Inter', system-ui, sans-serif;
+      --mono:    'JetBrains Mono', 'Fira Code', monospace;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font);
+      font-size: 15px;
+      line-height: 1.75;
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 0 24px 80px;
+    }
+
+    /* ── Typography ──────────────────────────────────────────────────────── */
+    h1 { font-size: 2rem;   color: #fff;        margin: 48px 0 6px; }
+    h2 { font-size: 1.45rem; color: var(--blue); margin: 56px 0 14px; border-bottom: 1px solid var(--border); padding-bottom: 6px; }
+    h3 { font-size: 1.1rem; color: var(--text); margin: 32px 0 10px; }
+    h4 { font-size: 0.95rem; color: var(--sub);  margin: 22px 0 8px; text-transform: uppercase; letter-spacing: 0.07em; }
+
+    p  { margin: 12px 0; color: var(--text); }
+
+    a  { color: var(--blue); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    /* ── Header / hero ───────────────────────────────────────────────────── */
+    header {
+      border-bottom: 1px solid var(--border);
+      padding: 40px 0 28px;
+      margin-bottom: 8px;
+    }
+    .byline { color: var(--sub); font-size: 0.88rem; margin-top: 10px; }
+    .tag {
+      display: inline-block;
+      background: var(--surf2);
+      border: 1px solid var(--border);
+      color: var(--sub);
+      font-size: 0.78rem;
+      padding: 2px 8px;
+      border-radius: 4px;
+      margin: 4px 4px 4px 0;
+    }
+
+    /* ── Callout boxes ───────────────────────────────────────────────────── */
+    .callout {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-left: 3px solid var(--blue);
+      border-radius: 0 6px 6px 0;
+      padding: 14px 18px;
+      margin: 20px 0;
+    }
+    .callout.green { border-left-color: var(--green); }
+    .callout.amber { border-left-color: var(--amber); }
+    .callout.red   { border-left-color: var(--red);   }
+
+    .callout-title {
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      color: var(--blue);
+      margin-bottom: 6px;
+      font-weight: 700;
+    }
+    .callout.green .callout-title { color: var(--green); }
+    .callout.amber .callout-title { color: var(--amber); }
+
+    /* ── Code blocks ─────────────────────────────────────────────────────── */
+    pre {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 14px 18px;
+      overflow-x: auto;
+      margin: 16px 0;
+      font-family: var(--mono);
+      font-size: 0.84rem;
+      line-height: 1.6;
+    }
+    code {
+      font-family: var(--mono);
+      font-size: 0.88em;
+      background: var(--surface);
+      padding: 1px 5px;
+      border-radius: 3px;
+      color: var(--amber);
+    }
+    pre code { background: none; padding: 0; color: var(--text); }
+
+    /* ── Figures ─────────────────────────────────────────────────────────── */
+    figure {
+      margin: 28px 0;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    figure img {
+      width: 100%;
+      display: block;
+    }
+    figcaption {
+      padding: 10px 16px 12px;
+      font-size: 0.83rem;
+      color: var(--sub);
+      line-height: 1.5;
+      border-top: 1px solid var(--border);
+    }
+    figcaption strong { color: var(--text); }
+
+    /* ── Tables ──────────────────────────────────────────────────────────── */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 20px 0;
+      font-size: 0.9rem;
+    }
+    th {
+      text-align: left;
+      padding: 8px 12px;
+      border-bottom: 1px solid var(--border);
+      color: var(--sub);
+      font-weight: 600;
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    td {
+      padding: 9px 12px;
+      border-bottom: 1px solid var(--border);
+      vertical-align: top;
+    }
+    tr:last-child td { border-bottom: none; }
+
+    /* ── KaTeX display override ───────────────────────────────────────────── */
+    .katex-display {
+      margin: 18px 0;
+      padding: 12px 18px;
+      background: var(--surface);
+      border-radius: 6px;
+      overflow-x: auto;
+    }
+
+    /* ── Source citations ────────────────────────────────────────────────── */
+    .cite {
+      color: var(--sub);
+      font-size: 0.85em;
+    }
+
+    /* ── Navigation ──────────────────────────────────────────────────────── */
+    nav {
+      position: sticky;
+      top: 0;
+      background: var(--bg);
+      border-bottom: 1px solid var(--border);
+      padding: 10px 0;
+      z-index: 100;
+      font-size: 0.83rem;
+      overflow-x: auto;
+      white-space: nowrap;
+    }
+    nav a {
+      color: var(--sub);
+      margin-right: 20px;
+    }
+    nav a:hover { color: var(--text); }
+
+    /* ── Result highlight ────────────────────────────────────────────────── */
+    .result {
+      background: var(--surf2);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 12px 16px;
+      margin: 14px 0;
+      font-family: var(--mono);
+      font-size: 0.85rem;
+    }
+    .result .key { color: var(--green); }
+    .result .val { color: var(--amber); }
+
+    /* ── Section badge ───────────────────────────────────────────────────── */
+    .section-badge {
+      display: inline-block;
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--sub);
+      background: var(--surf2);
+      border: 1px solid var(--border);
+      padding: 2px 8px;
+      border-radius: 12px;
+      margin-bottom: 6px;
+    }
+  </style>
+</head>
+<body>
+
+<nav style="display:flex; justify-content:space-between; align-items:center;">
+  <div>
+    <a href="#overview">Overview</a>
+    <a href="#barnes-hut">Barnes-Hut</a>
+    <a href="#verlet">Velocity Verlet</a>
+    <a href="#aarseth">Adaptive ∆t</a>
+    <a href="#photons">Photon Paths</a>
+    <a href="#nfw">NFW Halo</a>
+    <a href="#virial">Virial Theorem</a>
+    <a href="#verification">Verification</a>
+    <a href="#benchmarks">Benchmarks</a>
+    <a href="#ml">ML Connections</a>
+  </div>
+  <a href="https://gravitylenslab.netlify.app" target="_blank"
+     style="color:var(--blue); font-weight:600; white-space:nowrap; padding-left:16px; flex-shrink:0;">
+    ▶ Live Demo ↗
+  </a>
+</nav>
+
+<!-- ══════════════════════════════════════════════════════════════════════════ -->
+<header>
+  <div class="byline" style="margin-bottom:10px; color: var(--blue); font-weight:600; font-size:0.8rem; letter-spacing:.06em; text-transform:uppercase;">Technical Case Study</div>
+  <h1 style="margin-top:0;">Gravity Lens Lab</h1>
+  <p style="font-size:1.1rem; color:var(--sub); margin-top:6px;">
+    A browser-based N-body gravitational simulator with Barnes-Hut force calculation,
+    Schwarzschild photon lensing, and NFW dark matter halos — built in React + Three.js + Web Worker.
+  </p>
+  <div style="margin-top:14px;">
+    <span class="tag">React + Three.js</span>
+    <span class="tag">Web Worker</span>
+    <span class="tag">Barnes-Hut O(N log N)</span>
+    <span class="tag">Schwarzschild GR</span>
+    <span class="tag">Velocity Verlet</span>
+    <span class="tag">NFW Halo</span>
+    <span class="tag">Virial Theorem</span>
+  </div>
+  <div style="margin-top:16px; display:flex; align-items:center; gap:16px; flex-wrap:wrap;">
+    <a href="https://gravitylenslab.netlify.app"
+       target="_blank"
+       style="display:inline-flex; align-items:center; gap:6px;
+              background:var(--blue); color:#fff; font-size:0.83rem; font-weight:600;
+              padding:7px 16px; border-radius:6px; letter-spacing:0.03em; text-decoration:none;">
+      ▶ &nbsp;Live Demo
+    </a>
+    <a href="https://github.com/theluke1/n-body-sim"
+       target="_blank"
+       style="display:inline-flex; align-items:center; gap:6px;
+              background:var(--surf2); border:1px solid var(--border);
+              color:var(--sub); font-size:0.83rem;
+              padding:7px 16px; border-radius:6px; text-decoration:none;">
+      GitHub
+    </a>
+  </div>
+  <div class="byline" style="margin-top:12px;">
+    Luke Rapley &nbsp;·&nbsp; Physics + Analytics: AI &amp; Data Science &nbsp;·&nbsp; 2026
+  </div>
+</header>
+
+<!-- ══════════════════════════════════════════════════════════════════════════ -->
+<section id="overview">
+<h2>1 &nbsp; Project Overview</h2>
+
+<p>
+  Gravity Lens Lab is a real-time N-body gravitational simulator that runs entirely in the browser.
+  It integrates several distinct areas of computational astrophysics in a single interactive tool:
+  direct-sum and tree-based force calculation, symplectic numerical integration, Schwarzschild null
+  geodesic raytracing for gravitational lensing, an NFW dark matter halo potential, and virial
+  equilibration at spawn.
+</p>
+
+<p>
+  The goal is to build something that is <em>physically correct</em> — not just a visual toy, but a
+  system whose equations, approximations, and error properties I can explain, measure, and cite to
+  primary sources. Every physics claim in this document has been verified against the original paper
+  or textbook (see <a href="#verification">Section 8</a>).
+</p>
+
+<h4>Tech Stack</h4>
+<table>
+  <tr><th>Layer</th><th>Technology</th><th>Why</th></tr>
+  <tr><td>Rendering</td><td>React + Three.js (WebGL)</td><td>Real-time 3D, particle shaders</td></tr>
+  <tr><td>Physics</td><td>Web Worker (isolated thread)</td><td>Non-blocking UI during heavy compute</td></tr>
+  <tr><td>Integration</td><td>Velocity Verlet (symplectic)</td><td>Bounded energy error, long-time stability</td></tr>
+  <tr><td>Force calc</td><td>Barnes-Hut octree, O(N log N)</td><td>Scalable to N ~ 200+ in realtime</td></tr>
+  <tr><td>Lensing</td><td>Binet ODE, Schwarzschild metric</td><td>Exact GR null geodesics</td></tr>
+  <tr><td>Dark matter</td><td>Analytic NFW profile</td><td>Flat rotation curves, no extra particles</td></tr>
+  <tr><td>Benchmarks</td><td>Python + NumPy + SciPy</td><td>Independent validation of physics claims</td></tr>
+</table>
+</section>
+
+<!-- ══════════════════════════════════════════════════════════════════════════ -->
+<section id="barnes-hut">
+<h2>2 &nbsp; Barnes-Hut O(N log N) Force Calculation</h2>
+
+<h3>2.1 &nbsp; The problem: direct summation scales as O(N²)</h3>
+
+<p>
+  The gravitational acceleration on particle $i$ from all other particles is:
+</p>
+
+$$\mathbf{a}_i = \sum_{j \neq i} \frac{G m_j (\mathbf{r}_j - \mathbf{r}_i)}{|\mathbf{r}_j - \mathbf{r}_i|^2 + \varepsilon^2}^{3/2}$$
+
+<p>
+  where $\varepsilon$ is a gravitational softening length that prevents divergence at close approach.
+  Computing this for all $N$ particles requires $O(N^2)$ pair evaluations — infeasible in real-time
+  for $N \gtrsim 50$.
+</p>
+
+<h3>2.2 &nbsp; The tree approximation</h3>
+
+<p>
+  Barnes &amp; Hut (1986) introduced a hierarchical tree algorithm that reduces the cost to
+  $O(N \log N)$. The core idea: particles far from the query point can be grouped and treated as a
+  single point mass at their combined center of mass — an approximation that is accurate when the
+  group is small relative to its distance.
+</p>
+
+<p>
+  The simulator builds a 3D <strong>octree</strong> over the particle positions at each timestep.
+  Each internal node stores the total mass and center of mass of all particles in its subtree.
+  The force on particle $i$ is then computed by <em>tree-walking</em> from the root:
+</p>
+
+<div class="callout green">
+  <div class="callout-title">Opening-angle criterion (Barnes &amp; Hut 1986)</div>
+  <p>
+    For a tree cell with side length $s$ and center-of-mass at distance $d$ from particle $i$:
+  </p>
+  $$\text{if } \frac{s}{d} < \theta \implies \text{treat as single point mass}$$
+  $$\text{otherwise } \implies \text{recurse into 8 child cells}$$
+  <p style="margin-top:8px">
+    The ratio $s/d$ is the <strong>angular size</strong> of the cell as seen from particle $i$.
+    $\theta$ is the opening-angle parameter (units: radians; default $\theta = 0.7$).
+  </p>
+</div>
+
+<figure>
+  <img src="figures/diagram_bh_criterion.png" alt="Barnes-Hut opening-angle criterion diagram">
+  <figcaption>
+    <strong>Fig 1 — diagram.</strong> The Barnes-Hut opening-angle criterion. <em>Left:</em>
+    s/d = 0.65 &lt; θ = 0.7 — the cell is angularly small enough; treat all its particles as a
+    single point mass at the center of mass (green: APPROXIMATE, O(1) cost).
+    <em>Right:</em> s/d = 1.07 ≥ θ — the cell subtends too large an angle; recurse into 8 child
+    cells (red: RECURSE). The criterion reduces force evaluation from O(N²) to O(N log N) while
+    bounding force error at 9θ²/4 per cell (Hernquist 1987).
+  </figcaption>
+</figure>
+
+<figure>
+  <img src="figures/force_error_theta.png" alt="Barnes-Hut force error vs opening angle θ">
+  <figcaption>
+    <strong>Fig 2 — benchmark.</strong> Relative force error (mean and max) vs opening angle θ for N = 200
+    particles, compared to exact O(N²) forces. The theoretical bound $9\theta^2/4$ from Hernquist
+    (1987) is shown as a dashed line. At the simulator's default $\theta = 0.7$, mean error is
+    1.77% — consistent with the ~1% operational claim. Max error is higher (31.6%) because it
+    reflects worst-case near-boundary particles, not the typical case.
+  </figcaption>
+</figure>
+
+<h3>2.3 &nbsp; Force error and the θ = 0.7 choice</h3>
+
+<p>
+  The opening angle $\theta$ controls the accuracy–speed tradeoff. Small $\theta$ (fewer approximations)
+  gives lower force error but slower computation; large $\theta$ is faster but less accurate.
+</p>
+
+<p>
+  Hernquist (1987) gives the worst-case per-cell force error:
+</p>
+
+$$\Delta F_{\text{max}} = \frac{9\theta^2}{4}$$
+
+<p>
+  At $\theta = 0.7$: $9 \times 0.49 / 4 \approx 1.10$ — a per-cell worst-case bound. The aggregate
+  simulation error (mean over all particles) is lower because errors from different cells partially
+  cancel. Our benchmark confirms this: mean error 1.77%, max 31.6% at $\theta = 0.7$ for $N = 200$.
+</p>
+
+<p>
+  The choice $\theta = 0.7$ matches the GADGET-2 cosmological N-body code (Springel 2005), which
+  uses this value for production simulations. It gives roughly 1% mean force error, adequate for
+  collisionless dynamics where orbital chaos already limits long-term predictability.
+</p>
+
+<div class="result">
+  <span class="key">θ = 0.7</span> &nbsp;→&nbsp;
+  <span class="val">mean error 1.77%</span> &nbsp;|&nbsp;
+  <span class="val">max error 31.6%</span> &nbsp;|&nbsp;
+  Hernquist bound: 9θ²/4 = 1.10
+</div>
+
+<h3>2.4 &nbsp; What was wrong in the original code</h3>
+
+<p>
+  The original simulator had a mean-field approximation that was <em>labelled</em> as Barnes-Hut
+  but was not: for $N > 120$, all particles were collapsed into a single center of mass and only
+  that monopole was used. This is a $O(N)$ monopole, not a $O(N \log N)$ tree. The case study
+  audit identified this and replaced it with a proper 3D octree implementation.
+</p>
+
+<p>
+  <span class="cite">Sources: Barnes &amp; Hut (1986), <em>Nature</em> 324, 446–449 &nbsp;·&nbsp;
+  Hernquist (1987), <em>ApJS</em> 64, 715–734 &nbsp;·&nbsp;
+  Springel (2005), <em>MNRAS</em> 364, 1105–1134 (GADGET-2)</span>
+</p>
+</section>
+
+<!-- ══════════════════════════════════════════════════════════════════════════ -->
+<section id="verlet">
+<h2>3 &nbsp; Velocity Verlet — Symplectic Integration</h2>
+
+<h3>3.1 &nbsp; The algorithm</h3>
+
+<p>
+  The simulator integrates Newton's equations of motion using <strong>Velocity Verlet</strong>,
+  also called the Störmer-Verlet or leapfrog integrator. At each timestep $h$:
+</p>
+
+<pre><code>1.  v_{n+½} = v_n + (h/2) a_n           # half-kick
+2.  q_{n+1} = q_n + h · v_{n+½}         # drift
+3.  a_{n+1} = ∇V(q_{n+1}) / m          # force eval (one per step)
+4.  v_{n+1} = v_{n+½} + (h/2) a_{n+1}  # half-kick</code></pre>
+
+<p>
+  This is a three-pass scheme: two force-free half-steps for velocity surround one full position
+  step. Crucially, the force is evaluated <em>once per step</em> (same cost as simple Euler), but
+  the accuracy is second-order, not first.
+</p>
+
+<h3>3.2 &nbsp; Why symplecticity matters</h3>
+
+<p>
+  The key property that makes Velocity Verlet the standard choice for N-body simulation is
+  <strong>symplecticity</strong>. For a Hamiltonian system $H(q, p)$, a symplectic integrator's
+  update map $(q_n, p_n) \to (q_{n+1}, p_{n+1})$ has Jacobian determinant exactly equal to 1:
+</p>
+
+$$\det\!\left(\frac{\partial(q_{n+1}, p_{n+1})}{\partial(q_n, p_n)}\right) = 1$$
+
+<p>
+  This means the map <em>preserves phase-space volume</em> — a discrete analogue of Liouville's
+  theorem. As a consequence, VV exactly conserves a <em>modified Hamiltonian</em>
+  $\tilde{H} = H + O(h^2)$ nearby the true one. The energy error does not drift; it oscillates
+  within a bounded band forever.
+</p>
+
+<p>
+  RK4, by contrast, is fourth-order accurate per step but is <em>not</em> symplectic.
+  $\det(J) \neq 1$ — each step leaks a small amount of energy. Over thousands of steps, these
+  leaks compound into secular drift that is unphysical.
+</p>
+
+<figure>
+  <img src="figures/diagram_vv_phase_space.png" alt="Velocity Verlet symplecticity diagram">
+  <figcaption>
+    <strong>Fig 3 — diagram.</strong> Symplecticity visualised. <em>Left:</em> Phase space
+    portrait of body 0 — Velocity Verlet (green) traces bounded, overlapping ellipses forever; RK4
+    (red) shows inner and outer ellipses diverging, representing 9% energy drift by step 10,000.
+    <em>Right:</em> The three-pass VV algorithm — half-kick → drift → force eval → half-kick — and
+    the symplecticity condition det(J) = 1 (Liouville's theorem). ML connection box: this is
+    exactly the leapfrog integrator used inside HMC samplers (PyMC, Stan, NumPyro).
+  </figcaption>
+</figure>
+
+<figure>
+  <img src="figures/energy_conservation.png" alt="Energy conservation: Velocity Verlet vs RK4">
+  <figcaption>
+    <strong>Fig 4 — benchmark.</strong> Relative energy error $|\Delta E / E_0|$ over 10,000 steps at
+    $h = 0.05$ for an N = 6 body system (softening $\varepsilon = 0.3$). <em>Left:</em> VV
+    energy oscillates within a bounded band (~10⁻³ max); RK4 drifts monotonically from
+    2×10⁻³ → 9×10⁻² (15× worse at step 10,000). <em>Right:</em> Phase space portrait of body 0 —
+    VV traces a dense, bounded band; RK4 spirals outward.
+  </figcaption>
+</figure>
+
+<div class="result">
+  Step 10,000 &nbsp;|&nbsp;
+  <span class="key">VV: |ΔE/E₀| ≈ 5.5×10⁻³</span> &nbsp;|&nbsp;
+  <span style="color:var(--red)">RK4: |ΔE/E₀| ≈ 9.1×10⁻² &nbsp;(15× worse)</span>
+</div>
+
+<h3>3.3 &nbsp; Practical consequences</h3>
+
+<p>
+  For a gravitational N-body simulation that runs at real-time interactive speeds (60 fps, ~200
+  steps per frame), numerical drift would visibly corrupt orbital evolution over seconds of
+  wall-clock time. VV's bounded error guarantees that orbits remain physically plausible — stars
+  in the Galaxy Core preset stay on approximately correct trajectories even after minutes of simulation.
+</p>
+
+<p>
+  <span class="cite">Sources: Hairer, Lubich &amp; Wanner (2002), <em>Geometric Numerical Integration</em>, Ch. VI &nbsp;·&nbsp;
+  Springel (2005), GADGET-2 §4.1</span>
+</p>
+</section>
+
+<!-- ══════════════════════════════════════════════════════════════════════════ -->
+<section id="aarseth">
+<h2>4 &nbsp; Aarseth Adaptive Timestep</h2>
+
+<p>
+  A fixed global timestep is inefficient when the system contains particles with very different
+  dynamical timescales — close binaries need tiny steps while wide-orbit stars can take large ones.
+  The simulator uses an <strong>Aarseth-style</strong> adaptive criterion: each particle $i$ gets
+  its own substep size based on the ratio of force to force-derivative:
+</p>
+
+$$\delta t_i = \eta \sqrt{\frac{|\mathbf{a}_i|}{|\dot{\mathbf{a}}_i|}}$$
+
+<p>
+  where $\dot{\mathbf{a}}_i$ is the <strong>jerk</strong> (time derivative of acceleration), and
+  $\eta \approx 0.02$ is a dimensionless accuracy parameter. The quantity
+  $\sqrt{|a|/|\dot{a}|}$ has units of time — it is the local dynamical timescale, the timescale
+  on which the force is changing significantly.
+</p>
+
+<p>
+  Particles are grouped into <strong>block timesteps</strong> — a small set of discrete step sizes
+  $h_k = h_{\max} / 2^k$ — so that multiple particles can be advanced together with a single force
+  evaluation. This is the scheme used in GADGET-2 (Springel 2005, §2.6) and the original Aarseth
+  N-body codes.
+</p>
+
+<div class="callout amber">
+  <div class="callout-title">Audit finding</div>
+  <p>
+    The original code had a hard cap of 1 substep for $N > 120$ and $N > 80$, preventing the
+    adaptive scheme from running at full resolution during high-load scenarios. This cap was
+    removed; the ceiling is now 64 substeps as a safety bound.
+  </p>
+</div>
+
+<p>
+  <span class="cite">Sources: Aarseth (2003), <em>Gravitational N-Body Simulations</em>, §2.6 &nbsp;·&nbsp;
+  Springel (2005), GADGET-2 §2.6</span>
+</p>
+</section>
+
+<!-- ══════════════════════════════════════════════════════════════════════════ -->
+<section id="photons">
+<h2>5 &nbsp; Schwarzschild Photon Paths and Gravitational Lensing</h2>
+
+<h3>5.1 &nbsp; The Binet equation for null geodesics</h3>
+
+<p>
+  In Schwarzschild spacetime, a photon with impact parameter $b$ (perpendicular distance from the
+  black hole center to the asymptotic incoming ray) follows a null geodesic governed by the
+  <strong>Binet equation</strong>:
+</p>
+
+$$\frac{d^2 u}{d\varphi^2} + u = \frac{3 r_s}{2} u^2$$
+
+<p>
+  where $u = 1/r$, $r_s = 2GM/c^2$ is the Schwarzschild radius, and $\varphi$ is the orbital
+  angle. The right-hand side is the relativistic correction — without it ($u'' + u = 0$) the
+  orbit is a straight line.
+</p>
+
+<p>
+  The simulator integrates this ODE numerically using RK45, starting the photon far from the
+  black hole and following it until it either escapes or crosses the event horizon.
+</p>
+
+<h3>5.2 &nbsp; The photon sphere and critical impact parameter</h3>
+
+<p>
+  Setting $d^2 u / d\varphi^2 = 0$ (circular orbit condition) in the Binet equation gives:
+</p>
+
+$$u = \frac{2}{3 r_s} \implies r_{\text{PS}} = \frac{3}{2} r_s$$
+
+<p>
+  This is the <strong>photon sphere</strong>: an unstable circular orbit at $r = 1.5\, r_s$ where
+  photons can orbit the black hole indefinitely. It is unstable — a slight perturbation either
+  sends the photon spiraling inward to capture or outward to escape.
+</p>
+
+<p>
+  The impact parameter corresponding to the photon sphere orbit — the <strong>critical impact
+  parameter</strong> — is:
+</p>
+
+$$b_0 = \frac{3\sqrt{3}}{2} r_s \approx 2.598\, r_s$$
+
+<p>
+  This divides photon behavior into three regimes:
+</p>
+
+<table>
+  <tr><th>Impact parameter</th><th>Fate</th><th>Deflection angle</th></tr>
+  <tr><td>$b < b_0$</td><td>Captured — crosses event horizon</td><td>—</td></tr>
+  <tr><td>$b \approx b_0$</td><td>Near-photon-sphere — multiple orbits</td><td>$\Delta\varphi \to \infty$ logarithmically</td></tr>
+  <tr><td>$b \gg b_0$</td><td>Deflected escape — weak-field limit</td><td>$\Delta\varphi \approx 2r_s / b$</td></tr>
+</table>
+
+<figure>
+  <img src="figures/diagram_photon_sphere.png" alt="Schwarzschild photon sphere geometry diagram">
+  <figcaption>
+    <strong>Fig 5 — diagram.</strong> Photon sphere geometry in Schwarzschild spacetime.
+    The black hole event horizon sits at $r_s$ (black circle); the photon sphere at
+    $r = 1.5\, r_s$ (dashed blue circle). Three trajectories enter from the right:
+    <em>red</em> — b &lt; b₀, captured (crosses the event horizon);
+    <em>amber</em> — b ≈ b₀, grazes the photon sphere and wraps dramatically before escaping
+    (deflection angle → ∞ logarithmically);
+    <em>green</em> — moderate b ≫ b₀, deflected escape (weak-field regime).
+    Critical impact parameter b₀ = 3√3/2 · r_s ≈ 2.598 r_s. Source: MTW §25.6.
+  </figcaption>
+</figure>
+
+<h3>5.3 &nbsp; Exact GR deflection via orbit integral</h3>
+
+<p>
+  The exact deflection angle for a photon with $b > b_0$ can be computed without ODE integration
+  using the <strong>orbit integral</strong> (Misner, Thorne &amp; Wheeler 1973, §25.6):
+</p>
+
+$$\Delta\varphi = 2 \int_0^{u_{\text{peri}}} \frac{du}{\sqrt{1/b^2 - u^2 + r_s u^3}} - \pi$$
+
+<p>
+  where $u_{\text{peri}} = 1/r_{\min}$ is the periapsis (turning point), found by solving
+  $1/b^2 - u^2 + r_s u^3 = 0$ for the smallest positive root. The integrand has an integrable
+  singularity at the upper limit (the denominator vanishes at the turning point), handled
+  automatically by Gaussian quadrature.
+</p>
+
+<div class="callout amber">
+  <div class="callout-title">Why ODE exit detection fails near b₀</div>
+  <p>
+    Near the photon sphere, photon trajectories have a Cantor-set (fractal) structure in impact
+    parameter space — even for $b = 10 b_0$, a measure-zero set of $b$ values causes the photon
+    to complete exactly $n$ full orbits before escaping. ODE exit detection cannot reliably
+    distinguish "escaped" from "still orbiting" without the analytic periapsis solution. The orbit
+    integral approach completely avoids this problem: it computes the deflection analytically
+    from the conserved quantities alone.
+  </p>
+</div>
+
+<figure>
+  <img src="figures/photon_deflection.png" alt="Schwarzschild photon deflection angle">
+  <figcaption>
+    <strong>Fig 6 — benchmark.</strong> <em>Left:</em> Exact GR deflection angle $\Delta\varphi$ vs impact
+    parameter $b$ (log scale). The exact orbit integral (blue) diverges as $b \to b_0$ (photon
+    sphere), converging to the GR weak-field formula $2r_s/b$ (green dashed) at large $b$. The
+    Newtonian prediction $r_s/b$ (amber dotted) is exactly half the GR value — the famous factor
+    of 2 confirmed by Eddington (1919). <em>Right:</em> Three representative photon trajectories:
+    captured (red), near-photon-sphere (yellow, dramatic winding), moderate escape (green).
+  </figcaption>
+</figure>
+
+<div class="result">
+  <span class="key">b = 1.01 b₀:</span> <span class="val">Δφ = 242°</span> &nbsp;|&nbsp;
+  <span class="key">b = 10 b₀:</span> <span class="val">Δφ = 4.68°</span> &nbsp;|&nbsp;
+  <span class="key">b = 20 b₀:</span> <span class="val">Δφ = 2.27°</span> (GR weak-field: 2.21°)
+</div>
+
+<p>
+  At $b = 20\, b_0$, the exact result (2.27°) is only 3% above the weak-field approximation
+  (2.21°), confirming the limit $\Delta\varphi \to 2r_s/b$ at large $b$. The GR prediction is
+  exactly twice the Newtonian value — the Eddington 1919 observation that launched observational
+  evidence for General Relativity.
+</p>
+
+<h3>5.4 &nbsp; Image-plane photon scan mode</h3>
+
+<p>
+  The original simulator spawned photons in a cone around the camera. This makes the photon
+  sphere hard to study because photons are randomly distributed in angle, not in impact parameter.
+  The new <strong>image-plane mode</strong> sweeps impact parameters uniformly across a plane
+  perpendicular to the camera–black hole axis, directly revealing the photon sphere boundary,
+  Einstein ring geometry, and capture shadow.
+</p>
+
+<p>
+  <span class="cite">Sources: Misner, Thorne &amp; Wheeler (1973), §25.6 &nbsp;·&nbsp;
+  Wald (1984), Ch. 11 &nbsp;·&nbsp; Darwin (1959), <em>Proc. Roy. Soc. A</em> 249, 180</span>
+</p>
+</section>
+
+<!-- ══════════════════════════════════════════════════════════════════════════ -->
+<section id="nfw">
+<h2>6 &nbsp; NFW Dark Matter Halo and the Rotation Curve Problem</h2>
+
+<h3>6.1 &nbsp; The problem: Keplerian rotation curves don't match observations</h3>
+
+<p>
+  For a test particle in circular orbit around a central mass $M$, the balance of gravity and
+  centripetal acceleration gives:
+</p>
+
+$$v(r) = \sqrt{\frac{G M}{r}} \propto \frac{1}{\sqrt{r}}$$
+
+<p>
+  This is the Keplerian prediction: circular velocity falls as $1/\sqrt{r}$ at large radii.
+  But spiral galaxies observed since the 1970s (Rubin, Vera &amp; Ford 1970; van Albada &amp;
+  Sancisi 1986) show <em>flat</em> rotation curves — $v(r) \approx \text{const}$ for decades
+  in radius. The discrepancy implies invisible mass (dark matter) distributed on scales much
+  larger than the visible stellar disk.
+</p>
+
+<h3>6.2 &nbsp; The NFW profile</h3>
+
+<p>
+  Navarro, Frenk &amp; White (1996, 1997) derived a universal density profile for dark matter
+  halos from cosmological N-body simulations:
+</p>
+
+$$\rho(r) = \frac{\rho_s}{(r/r_s)(1 + r/r_s)^2}$$
+
+<p>
+  where $\rho_s$ is a characteristic density and $r_s$ is the scale radius. Integrating this over
+  a sphere of radius $r$ gives the enclosed mass:
+</p>
+
+$$M_{\text{NFW}}(<r) = M_{\text{halo}} \left[\ln\!\left(1 + \frac{r}{r_s}\right) - \frac{r/r_s}{1 + r/r_s}\right]$$
+
+<p>
+  At $r \gg r_s$: $M(<r) \propto \ln(r)$, which grows slowly but does not saturate. The circular
+  velocity then scales as:
+</p>
+
+$$v(r) = \sqrt{\frac{G M(<r)}{r}} \sim \sqrt{\frac{G M_0 \ln r}{r}} \approx \text{const}$$
+
+<p>
+  producing a flat rotation curve — the signature of a dark matter halo.
+</p>
+
+<figure>
+  <img src="figures/rotation_curve.png" alt="NFW rotation curve benchmark">
+  <figcaption>
+    <strong>Fig 7 — benchmark.</strong> <em>Left:</em> Circular velocity profiles at Galaxy Core preset
+    parameters ($M_{\text{BH}} = 200$, $M_{\text{halo}} = 500$, $r_s = 3.0$ AU). Without the
+    NFW halo, velocity falls as Keplerian $1/\sqrt{r}$ (amber). With the NFW halo, the curve
+    flattens at large radii (green). <em>Right:</em> Enclosed mass — BH point mass vs NFW profile
+    vs total, showing the halo's slow $\ln(r)$ growth beyond the scale radius.
+  </figcaption>
+</figure>
+
+<div class="result">
+  <span class="key">r = 1.5 AU:</span> <span class="val">v_NFW / v_Kepler = 1.09×</span> &nbsp;|&nbsp;
+  <span class="key">r = 8.5 AU:</span> <span class="val">1.58×</span> &nbsp;|&nbsp;
+  <span class="key">r = 25 AU:</span> <span class="val">2.09×</span>
+</div>
+
+<p>
+  Toggling the NFW halo on/off in the Galaxy Core preset directly demonstrates dark matter's
+  dynamical effect: stars at large radii orbit significantly faster with the halo, with the
+  velocity enhancement growing with radius, exactly as observed in real galaxies.
+</p>
+
+<p>
+  <span class="cite">Sources: Navarro, Frenk &amp; White (1996), <em>ApJ</em> 462, 563 &nbsp;·&nbsp;
+  Navarro, Frenk &amp; White (1997), <em>ApJ</em> 490, 493</span>
+</p>
+</section>
+
+<!-- ══════════════════════════════════════════════════════════════════════════ -->
+<section id="virial">
+<h2>7 &nbsp; Virial Theorem and Equilibration</h2>
+
+<p>
+  For a gravitationally bound system in statistical equilibrium, the time-averaged kinetic and
+  potential energies satisfy the <strong>virial theorem</strong>:
+</p>
+
+$$2\langle KE \rangle + \langle PE \rangle = 0 \implies Q \equiv \frac{2 KE}{|PE|} = 1$$
+
+<p>
+  $Q = 1$ corresponds to virial equilibrium. $Q > 1$ means the system is kinetically hot — it
+  will expand (unbound if $Q \gg 1$). $Q < 1$ means it is cold and will collapse.
+</p>
+
+<p>
+  The simulator computes $Q$ every frame and displays it in the HUD. A new <strong>opt-in virial
+  equilibration</strong> feature rescales all particle velocities at spawn so that $Q = 1$ exactly
+  at $t = 0$:
+</p>
+
+$$v_i \to v_i \cdot \sqrt{\frac{|PE|}{2\,KE}}$$
+
+<p>
+  This gives a more physically realistic initial condition — without equilibration, a random
+  particle distribution is typically either too hot (expands rapidly) or too cold (collapses
+  immediately). Virial equilibration produces a system that evolves stably from the start.
+</p>
+
+<p>
+  The potential energy includes the gravitational contribution of the central black hole
+  (when present), so the rescaling accounts for the full system energy.
+</p>
+
+<p>
+  <span class="cite">Sources: Binney &amp; Tremaine (2008), <em>Galactic Dynamics</em>, §4.8 &nbsp;·&nbsp;
+  Aarseth, Hénon &amp; Wielen (1974), <em>A&amp;A</em> 37, 183</span>
+</p>
+</section>
+
+<!-- ══════════════════════════════════════════════════════════════════════════ -->
+<section id="verification">
+<h2>8 &nbsp; Physics Verification Methodology</h2>
+
+<p>
+  Every physics claim in the simulator — force error bounds, integrator properties, photon
+  deflection formulas, halo profiles — was verified against its primary source. The full
+  verification log lives at <code>docs/physics-verification-log.md</code>. A summary:
+</p>
+
+<table>
+  <tr>
+    <th>Claim</th><th>Primary source</th><th>Verdict</th>
+  </tr>
+  <tr>
+    <td>Barnes-Hut s/d < θ criterion, O(N log N)</td>
+    <td>Barnes &amp; Hut (1986), <em>Nature</em></td>
+    <td style="color:var(--green)">✅ Confirmed</td>
+  </tr>
+  <tr>
+    <td>Force error bound 9θ²/4</td>
+    <td>Hernquist (1987), <em>ApJS</em></td>
+    <td style="color:var(--green)">✅ Confirmed (per-cell worst case)</td>
+  </tr>
+  <tr>
+    <td>VV symplecticity, bounded energy error</td>
+    <td>Hairer et al. (2002)</td>
+    <td style="color:var(--green)">✅ Confirmed</td>
+  </tr>
+  <tr>
+    <td>Aarseth adaptive timestep: δt = η √|a|/|ȧ|</td>
+    <td>Aarseth (2003), §2.6</td>
+    <td style="color:var(--amber)">⚠️ Formula is dynamical-timescale form, not Eq. 2.13 exactly</td>
+  </tr>
+  <tr>
+    <td>Binet equation for null geodesics</td>
+    <td>MTW §25.6</td>
+    <td style="color:var(--green)">✅ Confirmed</td>
+  </tr>
+  <tr>
+    <td>Photon sphere at r = 1.5 r_s</td>
+    <td>MTW §25.6, Wald Ch. 11</td>
+    <td style="color:var(--green)">✅ Confirmed</td>
+  </tr>
+  <tr>
+    <td>b₀ = 3√3/2 · r_s ≈ 2.598 r_s</td>
+    <td>MTW §25.6</td>
+    <td style="color:var(--green)">✅ Confirmed (photon sphere impact parameter)</td>
+  </tr>
+  <tr>
+    <td>NFW profile ρ(r) and enclosed mass formula</td>
+    <td>NFW (1996), <em>ApJ</em></td>
+    <td style="color:var(--green)">✅ Confirmed</td>
+  </tr>
+  <tr>
+    <td>Virial theorem 2⟨KE⟩ + ⟨PE⟩ = 0</td>
+    <td>Binney &amp; Tremaine (2008), §4.8</td>
+    <td style="color:var(--green)">✅ Confirmed</td>
+  </tr>
+  <tr>
+    <td>Plummer sphere ρ ∝ (1 + r²/a²)^{-5/2}</td>
+    <td>Plummer (1911); Aarseth et al. (1974)</td>
+    <td style="color:var(--green)">✅ Confirmed</td>
+  </tr>
+</table>
+
+<p>
+  The verification process: for each claim, the cited paper was retrieved, the specific section
+  containing the claim was located, and the formula/result was compared to the code's implementation.
+  Cases marked ⚠️ indicate the physics is correct but the citation or phrasing needed adjustment.
+</p>
+</section>
+
+<!-- ══════════════════════════════════════════════════════════════════════════ -->
+<section id="benchmarks">
+<h2>9 &nbsp; Benchmark Results</h2>
+
+<p>
+  Four independent Python benchmarks in <code>benchmarks/</code> validate the simulator's physics
+  claims numerically. All code is self-contained (NumPy, SciPy, Matplotlib only) and reproducible.
+</p>
+
+<h3>9.1 &nbsp; Energy conservation: VV vs RK4</h3>
+
+<p>
+  <strong>Setup:</strong> N = 6 randomly initialised bodies, 10,000 steps at $h = 0.05$,
+  softening $\varepsilon = 0.3$.
+  Both integrators start from identical initial conditions. Exact O(N²) all-pairs force.
+</p>
+
+<table>
+  <tr><th>Integrator</th><th>|ΔE/E₀| at step 1,000</th><th>|ΔE/E₀| at step 10,000</th></tr>
+  <tr><td>Velocity Verlet</td><td>2.25×10⁻³</td><td>5.45×10⁻³ (oscillates)</td></tr>
+  <tr><td>RK4</td><td>2.15×10⁻³</td><td>9.07×10⁻² (monotone growth)</td></tr>
+</table>
+
+<h3>9.2 &nbsp; Barnes-Hut force error vs θ</h3>
+
+<p>
+  <strong>Setup:</strong> N = 200 random particles, 3D octree, exact O(N²) ground truth.
+  Relative error $|\mathbf{F}_{\text{tree}} - \mathbf{F}_{\text{exact}}| / |\mathbf{F}_{\text{exact}}|$.
+</p>
+
+<table>
+  <tr><th>θ</th><th>Mean error</th><th>Max error</th><th>Hernquist bound 9θ²/4</th></tr>
+  <tr><td>0.30</td><td>0.13%</td><td>1.03%</td><td>20.25%</td></tr>
+  <tr><td>0.50</td><td>0.58%</td><td>2.58%</td><td>56.25%</td></tr>
+  <tr><td style="color:var(--amber)">0.70</td><td style="color:var(--amber)">1.77%</td><td>31.6%</td><td>110%</td></tr>
+  <tr><td>0.90</td><td>3.78%</td><td>52.5%</td><td>182%</td></tr>
+</table>
+
+<p>
+  The Hernquist bound is a worst-case per-cell limit, so aggregate mean errors are consistently
+  much lower. The max error can be large because some particles happen to be near the boundary
+  of a cell that gets approximated — these are genuinely worst-case configurations, not typical.
+</p>
+
+<h3>9.3 &nbsp; Photon deflection: exact GR vs weak-field</h3>
+
+<p>
+  <strong>Setup:</strong> orbit integral via <code>scipy.integrate.quad</code> on
+  $1/\sqrt{1/b^2 - u^2 + r_s u^3}$, periapsis found by Brent's method. 128 impact parameters
+  from $1.001\, b_0$ to $20\, b_0$.
+</p>
+
+<table>
+  <tr><th>b / b₀</th><th>Δφ (exact)</th><th>Δφ (GR weak-field 2r_s/b)</th><th>Ratio</th></tr>
+  <tr><td>1.01</td><td>242.3°</td><td>43.7°</td><td>5.55×</td></tr>
+  <tr><td>1.10</td><td>119.2°</td><td>40.1°</td><td>2.97×</td></tr>
+  <tr><td>3.00</td><td>18.4°</td><td>14.7°</td><td>1.25×</td></tr>
+  <tr><td>10.0</td><td>4.68°</td><td>4.41°</td><td>1.06×</td></tr>
+  <tr><td>20.0</td><td>2.27°</td><td>2.21°</td><td>1.03×</td></tr>
+</table>
+
+<h3>9.4 &nbsp; NFW rotation curve</h3>
+
+<p>
+  <strong>Setup:</strong> Analytic computation at Galaxy Core preset parameters
+  ($M_{\text{BH}} = 200$, $M_{\text{halo}} = 500$, $r_s = 3.0$ AU).
+</p>
+
+<table>
+  <tr><th>r (AU)</th><th>v_Keplerian</th><th>v_+NFW</th><th>Ratio</th></tr>
+  <tr><td>1.5</td><td>11.55</td><td>12.55</td><td>1.09×</td></tr>
+  <tr><td>5.0</td><td>6.32</td><td>8.69</td><td>1.37×</td></tr>
+  <tr><td>15.0</td><td>3.65</td><td>6.73</td><td>1.84×</td></tr>
+  <tr><td>25.0</td><td>2.83</td><td>5.90</td><td>2.09×</td></tr>
+</table>
+
+<h3>9.5 &nbsp; Orbit stability classifier — ML Option A</h3>
+
+<p>
+  <strong>Setup:</strong> 3,000 random 3-body simulations (N = 3, 2,000 Velocity Verlet steps,
+  $h = 0.02$, $\varepsilon = 0.15$). Initial conditions sampled to span
+  $Q \in [0.2, 4]$ (log-normal, peak at Q = 1). Three classes: stable triple, binary +
+  escapee, dissolved. Features extracted from initial state only — no simulation
+  lookahead.
+</p>
+
+<figure>
+  <img src="figures/orbit_classifier.png" alt="Orbit stability classifier results">
+  <figcaption>
+    <strong>Fig 8 — ML benchmark.</strong> Orbit stability classifier trained on 3,000
+    simulated 3-body outcomes. <em>Left:</em> Q_init distribution by outcome — high-Q
+    systems dissolve, low-Q systems form stable triples, intermediate Q produces binaries.
+    <em>Center:</em> Random Forest feature importances — Q_init is the dominant predictor
+    (~35%), followed by r_min, r_max, and mass_ratio. <em>Right:</em> ROC curves for
+    Gradient Boosting (one-vs-rest) — AUC > 0.93 for stable class, > 0.83 for binary.
+    Test accuracy: Logistic Regression 89.8% → Random Forest 91.3% (naive baseline:
+    79.6% from always predicting stable).
+  </figcaption>
+</figure>
+
+<table>
+  <tr><th>Model</th><th>CV accuracy (5-fold)</th><th>Test accuracy</th><th>Notes</th></tr>
+  <tr><td>Logistic Regression (baseline)</td><td>88.0% ± 0.9%</td><td>89.8%</td><td>Linear boundary; fast training</td></tr>
+  <tr><td style="color:var(--amber)">Random Forest</td><td style="color:var(--amber)">89.0% ± 1.2%</td><td style="color:var(--amber)">91.3%</td><td>Top feature importances, 200 trees</td></tr>
+  <tr><td>Gradient Boosting</td><td>87.5% ± 0.7%</td><td>90.8%</td><td>Best ROC-AUC on minority class</td></tr>
+</table>
+
+<p>
+  The key insight: Q_init alone explains most of the variance, validating why the
+  virial ratio is the central diagnostic displayed in the simulator HUD. But the
+  remaining features — minimum pairwise separation $r_{\min}$ and mass ratio — capture
+  geometric instabilities that Q misses (a system can have Q ≈ 1 but still eject a body
+  if one pair is dangerously close).
+</p>
+</section>
+
+<!-- ══════════════════════════════════════════════════════════════════════════ -->
+<section id="ml">
+<h2>10 &nbsp; Connections to Machine Learning</h2>
+
+<p>
+  The physics concepts implemented in this simulator appear throughout modern ML — often in
+  contexts where the connection to astrophysics is not immediately obvious.
+</p>
+
+<h3>10.1 &nbsp; Velocity Verlet = HMC Leapfrog</h3>
+
+<p>
+  The Velocity Verlet integrator is <em>exactly</em> the leapfrog integrator used in
+  <strong>Hamiltonian Monte Carlo</strong> (HMC), the sampling algorithm behind PyMC, Stan,
+  and NumPyro. In HMC, we sample from a posterior $p(\theta | x)$ by introducing auxiliary
+  momentum variables $p$ and treating $-\log p(\theta | x)$ as a potential energy. The leapfrog
+  integrator evolves trajectories through this "probability landscape" while conserving the
+  Hamiltonian (= log probability), ensuring the acceptance rate stays high.
+</p>
+
+<p>
+  Symplecticity is precisely why HMC works: because the integrator preserves phase-space volume,
+  the Markov chain proposal is reversible without exponential correction factors. The same
+  property that prevents energy drift in our N-body simulation is what makes HMC efficient for
+  Bayesian inference.
+</p>
+
+<h3>10.2 &nbsp; Barnes-Hut trees and spatial ML</h3>
+
+<p>
+  Octree spatial indexing underpins many ML algorithms: k-nearest-neighbor search (k-NN
+  classification, manifold learning), UMAP and t-SNE embedding, point cloud processing in
+  3D deep learning (PointNet), and approximate nearest-neighbor methods. The same
+  $O(N \log N)$ complexity argument applies — grouping distant points for bulk computation
+  is the same idea whether the points are gravitational masses or data embeddings.
+</p>
+
+<h3>10.3 &nbsp; Neural ODE connections</h3>
+
+<p>
+  The Binet equation is an ODE that the simulator solves numerically. Neural ODEs (Chen et al.
+  2018) parameterise the right-hand side of an ODE with a neural network and learn dynamics
+  from data. Symplectic neural networks and Hamiltonian neural networks impose the symplectic
+  constraint on the learned dynamics — the same physics-informed constraint that makes VV
+  outperform RK4 for long integrations.
+</p>
+
+<h3>10.4 &nbsp; ML Extension A — Orbit stability classifier (implemented)</h3>
+
+<p>
+  The simulator is used as a <strong>data generator</strong>: 3,000 random 3-body systems
+  are integrated forward in time, then labelled by outcome. A machine learning classifier
+  then learns to predict outcome from initial-state features alone — no simulation required
+  at inference time.
+</p>
+
+<p>
+  The strongest single predictor is the virial ratio $Q_{\text{init}} = 2KE/|PE|$ — the
+  same number displayed live in the simulator HUD. This is a direct validation:
+  the physics diagnostic the HUD was built to show is the number most predictive of
+  long-term system fate.
+</p>
+
+<div class="result">
+  Naive baseline (always predict stable): <span style="color:var(--sub)">79.6%</span> &nbsp;|&nbsp;
+  <span class="key">Random Forest: 91.3%</span> &nbsp;|&nbsp;
+  Gradient Boosting: 90.8% &nbsp;|&nbsp;
+  Q_init importance: ~35%
+</div>
+
+<p>
+  See Section 9.5 and Fig 8 for full results. Benchmark script: <code>benchmarks/orbit_classifier.py</code>.
+</p>
+
+<div class="callout green">
+  <div class="callout-title">ML Extension C — PINN for photon paths (planned)</div>
+  <p>
+    Train a Physics-Informed Neural Network on the Binet equation $u'' + u = (3r_s/2)u^2$
+    to predict photon deflection $\Delta\varphi(b)$ without numerically integrating the ODE.
+    The physics loss enforces the Binet equation at collocation points; the data loss matches
+    the orbit-integral benchmark from Section 9.3. Demonstrates PINN methodology on a real
+    General Relativity problem — exact GR, not an approximation.
+  </p>
+</div>
+</section>
+
+<!-- ══════════════════════════════════════════════════════════════════════════ -->
+<section id="conclusion">
+<h2>11 &nbsp; Summary</h2>
+
+<p>
+  Gravity Lens Lab implements six distinct areas of computational astrophysics in a single
+  interactive browser tool. Each component has been verified against primary sources, benchmarked
+  independently, and documented with enough depth to explain in an interview or a technical review.
+</p>
+
+<table>
+  <tr><th>Component</th><th>Key result</th><th>Primary source</th></tr>
+  <tr>
+    <td>Barnes-Hut octree</td>
+    <td>1.77% mean force error at θ = 0.7</td>
+    <td>Barnes &amp; Hut 1986; Hernquist 1987</td>
+  </tr>
+  <tr>
+    <td>Velocity Verlet</td>
+    <td>Energy error bounded at ~10⁻³; RK4 drifts 15× higher</td>
+    <td>Hairer, Lubich &amp; Wanner 2002</td>
+  </tr>
+  <tr>
+    <td>Aarseth adaptive ∆t</td>
+    <td>Per-particle dynamical timescale; block timestep grouping</td>
+    <td>Aarseth 2003; Springel 2005</td>
+  </tr>
+  <tr>
+    <td>Schwarzschild photon lensing</td>
+    <td>Exact GR deflection via orbit integral; photon sphere at r = 1.5 r_s</td>
+    <td>MTW §25.6; Wald Ch. 11</td>
+  </tr>
+  <tr>
+    <td>NFW dark matter halo</td>
+    <td>2.09× velocity boost at r = 25 AU; flat rotation curve confirmed</td>
+    <td>NFW 1996, 1997</td>
+  </tr>
+  <tr>
+    <td>Virial theorem</td>
+    <td>Q = 2KE/|PE| displayed live; opt-in equilibration at spawn</td>
+    <td>Binney &amp; Tremaine 2008</td>
+  </tr>
+  <tr>
+    <td>Orbit stability classifier (ML)</td>
+    <td>RF 91.3% test accuracy; Q_init top feature (~35%); simulation-as-data-generator</td>
+    <td>Valtonen &amp; Mikkola 1991; Stone &amp; Leigh 2019</td>
+  </tr>
+</table>
+
+<p style="margin-top:28px; color:var(--sub); font-size:0.9rem;">
+  All benchmark scripts: <code>benchmarks/</code> &nbsp;·&nbsp;
+  Verification log: <code>docs/physics-verification-log.md</code> &nbsp;·&nbsp;
+  Figures: <code>docs/figures/</code>
+</p>
+</section>
+
+<hr style="border:none; border-top:1px solid var(--border); margin: 60px 0 30px;">
+<p style="color:var(--sub); font-size:0.82rem; text-align:center;">
+  Luke Rapley &nbsp;·&nbsp; Gravity Lens Lab &nbsp;·&nbsp; 2026 &nbsp;·&nbsp;
+  Physics verified against primary sources — see <code>docs/physics-verification-log.md</code>
+</p>
+
+</body>
+</html>
