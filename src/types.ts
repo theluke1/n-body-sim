@@ -38,6 +38,7 @@ export interface Diagnostics {
   substeps: number;         // substeps used in last outer frame
   maxSubstepsHit: boolean;  // integrator ran out of substep budget
   rmin: number | null;      // min pairwise separation observed this frame
+  virialQ: number | null;   // 2KE/|PE| — 1.0 at virial equilibrium, null when unbound
   seed: number;
   eta: number;
   integratorMode: IntegratorMode;
@@ -54,6 +55,7 @@ export interface SimState {
   time: number;
   energy: number;
   running: boolean;
+  halo_on: boolean;         // NFW dark matter halo active (Galaxy Core preset only)
   selectedIndex: number | null;
   gpuActive: boolean;
   recordCount: number;
@@ -85,6 +87,18 @@ export interface SimConfig {
   //         period. Lower to ~0.01 for Pythagorean / hard scattering runs.
   seed: number;
   eta: number;
+  // Barnes-Hut opening angle. Cell treated as point mass when s/d < θ.
+  // ~1% force error at θ=0.7 (Hernquist 1987). Range 0.3–0.9.
+  theta: number;
+  // Opt-in virial equilibration: rescale spawn velocities so Q = 2KE/|PE| = 1.
+  virialEquil: boolean;
+  // NFW dark matter halo (Galaxy Core preset). haloRs: scale radius; haloMass: characteristic mass.
+  haloOn: boolean;
+  haloRs: number;
+  haloMass: number;
+  // Photon spawn mode: 'cone' = random scatter; 'image_plane' = systematic b-parameter sweep.
+  photonMode: 'cone' | 'image_plane';
+  imagePlaneWidth: number;  // max impact parameter as multiple of b_cr
 }
 
 export const INITIAL_STATE: SimState = {
@@ -94,6 +108,7 @@ export const INITIAL_STATE: SimState = {
   time: 0,
   energy: 0,
   running: false,
+  halo_on: false,
   selectedIndex: null,
   gpuActive: false,
   recordCount: 0,
@@ -118,4 +133,11 @@ export const INITIAL_CONFIG: SimConfig = {
   seed: 0xC0FFEE,
   // 0.025 = Aarseth 2003 recommended η. Lower this for chaotic 3-body runs.
   eta: 0.025,
+  theta: 0.7,
+  virialEquil: false,
+  haloOn: false,
+  haloRs: 3.0,
+  haloMass: 500,
+  photonMode: 'cone',
+  imagePlaneWidth: 5.0,
 };

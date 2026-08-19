@@ -24,6 +24,8 @@ export interface UISnap {
   bodyCount: number;
   diagnostics: Diagnostics | null;
   blackHole: BlackHoleState | null;
+  haloOn: boolean;       // NFW dark matter halo active (Galaxy Core preset)
+  photonsOn: boolean;    // photon tracing active
 }
 
 export function useSimulation(stateRef: MutableRefObject<SimState>) {
@@ -34,7 +36,7 @@ export function useSimulation(stateRef: MutableRefObject<SimState>) {
   const [uiSnap, setUiSnap] = useState<UISnap>({
     time: 0, energy: 0, running: false, gpuActive: false,
     recordCount: 0, selectedIndex: null, bodyCount: 0, diagnostics: null,
-    blackHole: null,
+    blackHole: null, haloOn: false, photonsOn: false,
   });
   const [config, setConfig] = useState<SimConfig>(INITIAL_CONFIG);
   const [log, setLog] = useState<string[]>([]);
@@ -64,6 +66,7 @@ export function useSimulation(stateRef: MutableRefObject<SimState>) {
           time:          d.t               ?? stateRef.current.time,
           energy:        d.energy          ?? stateRef.current.energy,
           running:       d.running         ?? stateRef.current.running,
+          halo_on:       d.halo_on         ?? stateRef.current.halo_on,
           selectedIndex: d.selected_index !== undefined ? d.selected_index : stateRef.current.selectedIndex,
           gpuActive:     stateRef.current.gpuActive,
           recordCount:   d.recorder?.record_count ?? stateRef.current.recordCount,
@@ -98,6 +101,8 @@ export function useSimulation(stateRef: MutableRefObject<SimState>) {
             dt: typeof d.config?.dt === 'number' ? d.config.dt : prev.dt,
             eta: typeof d.config?.eta === 'number' ? d.config.eta : prev.eta,
             integratorMode: d.config?.integrator_mode ?? prev.integratorMode,
+            // Sync haloOn from worker so preset loads (which reset it to false) are reflected
+            haloOn: typeof d.halo_on === 'boolean' ? d.halo_on : prev.haloOn,
           }));
           setUiSnap({
             time:          d.t                       ?? 0,
@@ -108,7 +113,9 @@ export function useSimulation(stateRef: MutableRefObject<SimState>) {
             selectedIndex: d.selected_index          ?? null,
             bodyCount:     d.bodies?.length          ?? 0,
             diagnostics:   d.diagnostics             ?? null,
-            blackHole:     d.black_hole               ?? null,
+            blackHole:     d.black_hole              ?? null,
+            haloOn:        d.halo_on                 ?? false,
+            photonsOn:     d.photons_on              ?? false,
           });
           // Sync log every 30 frames
           if (tickRef.current % 30 === 0) setLog([...logRef.current]);
@@ -186,8 +193,15 @@ export function useSimulation(stateRef: MutableRefObject<SimState>) {
       // diagnostics-baseline reset inside the worker (see set_seed / set_eta
       // handlers in physics.worker.js) so the next frame's E₀ lines up with
       // the new configuration.
-      if ('seed'           in updates) w.postMessage({ action: 'set_seed',            value: updates.seed });
-      if ('eta'            in updates) w.postMessage({ action: 'set_eta',             value: updates.eta });
+      if ('seed'           in updates) w.postMessage({ action: 'set_seed',             value: updates.seed });
+      if ('eta'            in updates) w.postMessage({ action: 'set_eta',              value: updates.eta });
+      if ('theta'          in updates) w.postMessage({ action: 'set_theta',            value: updates.theta });
+      if ('virialEquil'    in updates) w.postMessage({ action: 'set_virial_equil',     value: updates.virialEquil ? 1 : 0 });
+      if ('haloOn'         in updates) w.postMessage({ action: 'set_halo',             value: updates.haloOn ? 1 : 0 });
+      if ('haloRs'         in updates) w.postMessage({ action: 'set_halo_rs',          value: updates.haloRs });
+      if ('haloMass'       in updates) w.postMessage({ action: 'set_halo_mass',        value: updates.haloMass });
+      if ('photonMode'     in updates) w.postMessage({ action: 'set_photon_mode',      value: updates.photonMode });
+      if ('imagePlaneWidth' in updates) w.postMessage({ action: 'set_image_plane_width', value: updates.imagePlaneWidth });
       return next;
     });
   }, []);

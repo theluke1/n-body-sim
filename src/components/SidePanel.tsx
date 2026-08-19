@@ -306,6 +306,17 @@ export default function SidePanel({ open, snap, selectedBody, config, log, onSen
                   label="CLOSEST r_min"
                   value={snap.diagnostics.rmin !== null ? snap.diagnostics.rmin.toFixed(4) : '—'}
                 />
+                <DataRow
+                  label="VIRIAL Q = 2K/|U|"
+                  value={snap.diagnostics.virialQ !== null && snap.diagnostics.virialQ !== undefined
+                    ? snap.diagnostics.virialQ.toFixed(4)
+                    : '—'}
+                  color={(() => {
+                    const q = snap.diagnostics.virialQ;
+                    if (q === null || q === undefined) return 'var(--text-dim)';
+                    return Math.abs(q - 1) < 0.1 ? 'var(--green)' : Math.abs(q - 1) < 0.5 ? 'var(--amber)' : 'var(--red)';
+                  })()}
+                />
                 <DataRow label="TEXTBOOK" value="F = Gm₁m₂ / r²" color="var(--text-mono)" />
                 <DataRow label="ENERGY" value="E = K + U" color="var(--text-mono)" />
                 <DataRow label="ROTATION" value="L = r × p" color="var(--text-mono)" />
@@ -332,11 +343,95 @@ export default function SidePanel({ open, snap, selectedBody, config, log, onSen
                   </div>
                   <DataRow label="EVENT HORIZON" value={fmtRadius(snap.blackHole.event_horizon_radius)} color="var(--amber)" />
                   <DataRow label="PHOTON SPHERE" value={fmtRadius(snap.blackHole.photon_sphere_radius)} color="var(--text-mono)" />
-                  <DataRow label="SHADOW" value={fmtRadius(snap.blackHole.shadow_radius)} color="var(--text-mono)" />
+                  <DataRow label="SHADOW (b_cr)" value={fmtRadius(snap.blackHole.shadow_radius)} color="var(--text-mono)" />
                   <DataRow label="LENSING REGION" value={fmtRadius(snap.blackHole.lens_radius)} color="var(--text-mono)" />
                   <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-dim)', lineHeight: 1.6, marginTop: 6 }}>
                     Bodies are absorbed at the event horizon. The shadow and bent-light region are optical effects outside that boundary.
                   </div>
+
+                  {/* NFW dark matter halo toggle. Gated to Galaxy Core preset initially (DD-003).
+                     Toggle mid-simulation to watch the rotation curve change live. */}
+                  <div style={{ marginTop: 12, paddingTop: 10, borderTop: '1px solid var(--border)' }}>
+                    <div style={{ fontFamily: 'var(--font-mono)', fontSize: 8, color: 'var(--purple)', letterSpacing: 2, marginBottom: 8 }}>
+                      DARK MATTER HALO (NFW)
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                      <input
+                        type="checkbox"
+                        id="halo-on"
+                        checked={config.haloOn}
+                        onChange={e => onUpdateConfig({ haloOn: e.target.checked })}
+                        style={{ accentColor: 'var(--purple)', cursor: 'pointer' }}
+                      />
+                      <label htmlFor="halo-on" style={{
+                        fontFamily: 'var(--font-mono)', fontSize: 10,
+                        color: config.haloOn ? 'var(--purple)' : 'var(--text-dim)',
+                        cursor: 'pointer',
+                      }}>
+                        NFW halo {config.haloOn ? '● ON — rotation curve flat' : '○ OFF — Keplerian (1/√r)'}
+                      </label>
+                    </div>
+                    <div style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--text-dim)', marginLeft: 20 }}>
+                      ρ(r) = ρₛ / [(r/rₛ)(1+r/rₛ)²] · NFW 1996/1997
+                    </div>
+                  </div>
+
+                  {/* Photon spawn mode: cone (random) vs image-plane (systematic b sweep).
+                     Image-plane mode reveals the photon sphere — b_cr = 3√3/2 · r_s. */}
+                  {snap.photonsOn && (
+                    <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px solid var(--border)' }}>
+                      <div style={{ fontFamily: 'var(--font-mono)', fontSize: 8, color: 'var(--cyan)', letterSpacing: 2, marginBottom: 8 }}>
+                        PHOTON SPAWN MODE
+                      </div>
+                      <div style={{ display: 'flex', gap: 6 }}>
+                        <button
+                          className="mc-btn"
+                          style={{
+                            fontSize: 9, flex: 1,
+                            background: config.photonMode === 'cone' ? 'var(--cyan)' : 'transparent',
+                            color: config.photonMode === 'cone' ? 'var(--bg)' : 'var(--cyan)',
+                            border: '1px solid var(--cyan)',
+                          }}
+                          onClick={() => onUpdateConfig({ photonMode: 'cone' })}
+                        >
+                          CONE
+                        </button>
+                        <button
+                          className="mc-btn"
+                          style={{
+                            fontSize: 9, flex: 1,
+                            background: config.photonMode === 'image_plane' ? 'var(--cyan)' : 'transparent',
+                            color: config.photonMode === 'image_plane' ? 'var(--bg)' : 'var(--cyan)',
+                            border: '1px solid var(--cyan)',
+                          }}
+                          onClick={() => onUpdateConfig({ photonMode: 'image_plane' })}
+                        >
+                          IMAGE PLANE
+                        </button>
+                      </div>
+                      {config.photonMode === 'image_plane' && (
+                        <div style={{ marginTop: 8 }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 8, color: 'var(--text-dim)' }}>
+                              scan width (× b_cr)
+                            </span>
+                            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 8, color: 'var(--cyan)' }}>
+                              {config.imagePlaneWidth.toFixed(1)}×
+                            </span>
+                          </div>
+                          <input
+                            type="range" min={1} max={10} step={0.5}
+                            value={config.imagePlaneWidth}
+                            style={{ width: '100%', color: 'var(--cyan)' }}
+                            onChange={e => onUpdateConfig({ imagePlaneWidth: Number(e.target.value) })}
+                          />
+                          <div style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--text-dim)', marginTop: 2 }}>
+                            Sweeps b from 0 → {config.imagePlaneWidth.toFixed(1)} × b_cr to reveal photon sphere
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -344,7 +439,7 @@ export default function SidePanel({ open, snap, selectedBody, config, log, onSen
                  at the cost of wall-clock time. Mirrors Aarseth 2003 §2.4. */}
               <div style={{ marginTop: 10 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: 8, color: 'var(--text-dim)', letterSpacing: 1 }}>η</span>
+                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: 8, color: 'var(--text-dim)', letterSpacing: 1 }}>η (timestep safety factor)</span>
                   <span style={{ fontFamily: 'var(--font-mono)', fontSize: 8, color: 'var(--cyan)' }}>{config.eta.toFixed(3)}</span>
                 </div>
                 <input
@@ -353,6 +448,53 @@ export default function SidePanel({ open, snap, selectedBody, config, log, onSen
                   style={{ width: '100%', color: 'var(--cyan)' }}
                   onChange={e => onUpdateConfig({ eta: Number(e.target.value) })}
                 />
+              </div>
+
+              {/* θ slider: Barnes-Hut opening angle. Controls accuracy/speed tradeoff.
+                 At θ=0.7, force error ≈ 1% (Hernquist 1987). Range 0.3–0.9.
+                 Accurate / Standard / Fast labels match GADGET-2 conventions. */}
+              <div style={{ marginTop: 10 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: 8, color: 'var(--text-dim)', letterSpacing: 1 }}>
+                    θ (Barnes-Hut opening angle)
+                  </span>
+                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: 8, color: 'var(--cyan)' }}>
+                    {config.theta.toFixed(2)}&nbsp;
+                    <span style={{ color: 'var(--text-dim)' }}>
+                      {config.theta <= 0.4 ? '— Accurate' : config.theta <= 0.75 ? '— Standard' : '— Fast'}
+                    </span>
+                  </span>
+                </div>
+                <input
+                  type="range" min={0.3} max={0.9} step={0.05}
+                  value={config.theta}
+                  style={{ width: '100%', color: 'var(--cyan)' }}
+                  onChange={e => onUpdateConfig({ theta: Number(e.target.value) })}
+                />
+                <div style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--text-dim)', marginTop: 2 }}>
+                  ~1% force error at θ=0.7 · only applies when N &gt; 120 in realtime mode
+                </div>
+              </div>
+
+              {/* Virial equilibration: rescale spawn velocities so Q = 2KE/|PE| = 1.
+                 Default off — arbitrary Q is physically interesting (collapse, dispersal). */}
+              <div style={{ marginTop: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
+                <input
+                  type="checkbox"
+                  id="virial-equil"
+                  checked={config.virialEquil}
+                  onChange={e => onUpdateConfig({ virialEquil: e.target.checked })}
+                  style={{ accentColor: 'var(--cyan)', cursor: 'pointer' }}
+                />
+                <label htmlFor="virial-equil" style={{
+                  fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-dim)',
+                  cursor: 'pointer', letterSpacing: 0.5,
+                }}>
+                  Virial equilibrium at spawn (Q = 1)
+                </label>
+              </div>
+              <div style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--text-dim)', marginLeft: 20, marginTop: 2 }}>
+                Takes effect on next reset — rescales velocities so 2KE/|PE| = 1
               </div>
 
               {/* Seed field: any integer is valid; Mulberry32 mixes it well.

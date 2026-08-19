@@ -40,10 +40,24 @@ const cfg = {
   N: 5, spawnRadius: 10, massMin: 0.5, massMax: 3, velFactor: 0.6,
   bhMass: 200, bhPos: [0, 0, 0], collideRadius: 0.05,
   dphi_max: 0.06, N_photons: 12, beamSpread: 0.03, rsTarget: 0.25,
-  // Adaptive-timestep safety factor (Aarseth η). 0.025 ≈ 1/40 of closest-pair orbital time.
+  // Photon spawn mode: 'cone' (random scatter) | 'image_plane' (systematic b scan).
+  // Image-plane mode sweeps impact parameters 0 → imagePlaneWidth × b_cr,
+  // which reveals the photon sphere and Einstein ring geometry (Fix 6).
+  photonMode: 'cone', imagePlaneWidth: 5.0,
+  // Adaptive-timestep safety factor η. Step = η × sqrt(r³/GM) — fraction of local dynamical (Keplerian) timescale.
   eta: 0.025,
+  // Barnes-Hut opening angle θ. Cell is treated as a point mass when its angular size s/d < θ.
+  // Default 0.7 matches GADGET-2 (Springel 2005, MNRAS 364:1105). See DD-001.
+  theta: 0.7,
   // Seeded RNG — full reproducibility. Change via 'set_seed' message.
   seed: 0xC0FFEE,
+  // Opt-in virial equilibrium at spawn: rescale velocities so Q = 2KE/|PE| = 1 exactly.
+  // See DD-002. Default off — arbitrary Q produces interesting out-of-equilibrium dynamics.
+  virialEquil: false,
+  // NFW dark matter halo — analytic potential added to each body's acceleration.
+  // Gated to Galaxy Core preset initially (DD-003). Off by default.
+  // haloRs: NFW scale radius (sim AU); haloMass: NFW characteristic mass.
+  haloOn: false, haloRs: 3.0, haloMass: 500,
   // Gravity is the only exposed force mode.
   forceMode: 'gravity',
   integratorMode: 'realtime',
@@ -87,6 +101,7 @@ let diag = {
   px: 0, py: 0, pz: 0, // total linear momentum
   Lx: 0, Ly: 0, Lz: 0, // total angular momentum (about origin)
   rmin:           Infinity, // min pairwise separation this frame
+  virialQ:        null,    // 2KE/|PE| — 1.0 at virial equilibrium
 };
 
 // ── State ─────────────────────────────────────────────────────
@@ -248,8 +263,138 @@ class Photon {
   toDict() { return { id: this.id, trail: this.trail.slice(-40) }; }
 }
 
+// ── Barnes-Hut Octree ─────────────────────────────────────────
+// Replaces the mean-field monopole that was used for N > REALTIME_N_LIMIT.
+//
+// Each physics step:
+//   1. buildOctree() — partition all particles into a 3D octree in O(N log N)
+//   2. _treeWalk()   — for each particle, traverse the tree:
+//        • if a cell's angular size s/d < θ  →  treat as a single point mass
+//        • otherwise  →  recurse into its 8 children
+//
+// Complexity: O(N log N). Force error ≈ 9θ²/4 worst-case per cell
+// (Hernquist 1987, ApJS 64:715). θ = 0.7 keeps errors below ~1% for
+// collisionless dynamics (Hernquist, Hut & Makino 1993, ApJ 402:L85).
+// Reference: Barnes & Hut (1986), Nature 324:446.
+
+const OCT_MAX_DEPTH = 32;
+
+function _makeOctNode(cx, cy, cz, halfSize) {
+  return { cx, cy, cz, halfSize, mass: 0, cmx: 0, cmy: 0, cmz: 0, children: null };
+}
+
+function _octant(node, x, y, z) {
+  return ((x >= node.cx) ? 1 : 0) |
+         ((y >= node.cy) ? 2 : 0) |
+         ((z >= node.cz) ? 4 : 0);
+}
+
+// Insert particle (x,y,z,m) into node. depth guards against infinite recursion
+// when two particles occupy the same position.
+function _octInsert(node, x, y, z, m, depth) {
+  if (node.mass === 0) {
+    // Empty leaf — store particle directly.
+    node.mass = m; node.cmx = x; node.cmy = y; node.cmz = z;
+    return;
+  }
+
+  if (node.children === null) {
+    if (depth < OCT_MAX_DEPTH) {
+      // Occupied leaf — subdivide into 8 children.
+      const h = node.halfSize * 0.5;
+      node.children = [];
+      for (let oct = 0; oct < 8; oct++) {
+        node.children.push(_makeOctNode(
+          node.cx + ((oct & 1) ? h : -h),
+          node.cy + ((oct & 2) ? h : -h),
+          node.cz + ((oct & 4) ? h : -h),
+          h
+        ));
+      }
+      // Re-insert existing particle (its position is in cmx/cmy/cmz at this point).
+      _octInsert(node.children[_octant(node, node.cmx, node.cmy, node.cmz)],
+                 node.cmx, node.cmy, node.cmz, node.mass, depth + 1);
+      // Insert new particle into correct child.
+      _octInsert(node.children[_octant(node, x, y, z)], x, y, z, m, depth + 1);
+    }
+    // At max depth: accumulate mass here (graceful degradation for coincident particles).
+  } else {
+    // Internal node — route new particle to correct child.
+    _octInsert(node.children[_octant(node, x, y, z)], x, y, z, m, depth + 1);
+  }
+
+  // Update this node's total mass and center of mass.
+  const newMass = node.mass + m;
+  node.cmx = (node.cmx * node.mass + x * m) / newMass;
+  node.cmy = (node.cmy * node.mass + y * m) / newMass;
+  node.cmz = (node.cmz * node.mass + z * m) / newMass;
+  node.mass = newMass;
+}
+
+function buildOctree(positions, masses, n) {
+  if (n === 0) return null;
+
+  // Compute bounding box.
+  let xmin = positions[0][0], xmax = xmin;
+  let ymin = positions[0][1], ymax = ymin;
+  let zmin = positions[0][2], zmax = zmin;
+  for (let i = 1; i < n; i++) {
+    const x = positions[i][0], y = positions[i][1], z = positions[i][2];
+    if (x < xmin) xmin = x; else if (x > xmax) xmax = x;
+    if (y < ymin) ymin = y; else if (y > ymax) ymax = y;
+    if (z < zmin) zmin = z; else if (z > zmax) zmax = z;
+  }
+  const halfSize = Math.max(xmax - xmin, ymax - ymin, zmax - zmin) * 0.5 + 1e-6;
+  const root = _makeOctNode(
+    (xmin + xmax) * 0.5, (ymin + ymax) * 0.5, (zmin + zmax) * 0.5,
+    halfSize
+  );
+
+  for (let i = 0; i < n; i++) {
+    _octInsert(root, positions[i][0], positions[i][1], positions[i][2],
+               Math.max(0.001, masses[i]), 0);
+  }
+  return root;
+}
+
+// Walk the tree and accumulate gravitational acceleration into acc (modified in place).
+// theta2 = θ²,  eps2 = ε² (softening).
+function _treeWalk(node, px, py, pz, theta2, eps2, acc) {
+  if (!node || node.mass === 0) return;
+
+  const dx = node.cmx - px;
+  const dy = node.cmy - py;
+  const dz = node.cmz - pz;
+  const r2 = dx*dx + dy*dy + dz*dz;
+
+  if (node.children === null) {
+    // Leaf — skip self-interaction, otherwise apply force.
+    if (r2 < 1e-14) return;
+    const r2s = r2 + eps2;
+    const ir3 = G * node.mass / (r2s * Math.sqrt(r2s));
+    acc[0] += ir3 * dx; acc[1] += ir3 * dy; acc[2] += ir3 * dz;
+    return;
+  }
+
+  // Internal node: θ criterion.  s² < θ² · d²  →  use center-of-mass approximation.
+  // s = 2 * halfSize (cell width).
+  if (4 * node.halfSize * node.halfSize < theta2 * r2) {
+    if (r2 < 1e-14) return;
+    const r2s = r2 + eps2;
+    const ir3 = G * node.mass / (r2s * Math.sqrt(r2s));
+    acc[0] += ir3 * dx; acc[1] += ir3 * dy; acc[2] += ir3 * dz;
+    return;
+  }
+
+  // Cell too large relative to distance — recurse into children.
+  for (let i = 0; i < 8; i++) {
+    _treeWalk(node.children[i], px, py, pz, theta2, eps2, acc);
+  }
+}
+
 // ── Force Computation ─────────────────────────────────────────
-// Uses Newton's 3rd law (N(N-1)/2 pairs) for all three modes.
+// Gravity mode + realtime + N > REALTIME_N_LIMIT → Barnes-Hut O(N log N).
+// All other cases → all-pairs O(N²).
 function computeAcc(positions, masses, charges) {
   const n    = positions.length;
   const acc  = Array.from({length: n}, () => [0, 0, 0]);
@@ -257,33 +402,20 @@ function computeAcc(positions, masses, charges) {
   const mode = cfg.forceMode;
   const realtime = approximationActiveFor(n);
 
-  if (realtime) {
-    let mt = 0, cx = 0, cy = 0, cz = 0;
+  if (realtime && mode === 'gravity') {
+    // Barnes-Hut O(N log N) — replaces the former mean-field monopole approximation.
+    const theta2 = cfg.theta * cfg.theta;
+    const root   = buildOctree(positions, masses, n);
     for (let i = 0; i < n; i++) {
-      const m = Math.max(0.001, masses[i]);
-      mt += m;
-      cx += positions[i][0] * m;
-      cy += positions[i][1] * m;
-      cz += positions[i][2] * m;
+      _treeWalk(root, positions[i][0], positions[i][1], positions[i][2],
+                theta2, eps2, acc[i]);
     }
-    if (mt > 0) { cx /= mt; cy /= mt; cz /= mt; }
-
-    const centerMass = centralOn && blackHole ? blackHole.mass : Math.max(8, mt * 0.28);
-    const center = centralOn && blackHole ? cfg.bhPos : [cx, cy, cz];
-    for (let i = 0; i < n; i++) {
-      const dx = center[0] - positions[i][0];
-      const dy = center[1] - positions[i][1];
-      const dz = center[2] - positions[i][2];
-      const r2 = dx*dx + dy*dy + dz*dz + Math.max(0.18, cfg.eps * 8) ** 2;
-      const f = G * centerMass / (r2 * Math.sqrt(r2));
-      acc[i][0] = f * dx;
-      acc[i][1] = f * dy;
-      acc[i][2] = f * dz;
-    }
-    return acc;
+    // Fall through to 1PN BH correction below (do NOT return early).
   }
 
-  for (let i = 0; i < n; i++) {
+  if (!realtime || mode !== 'gravity') {
+    // All-pairs O(N²) — used for small N, or non-gravity force modes at any N.
+    for (let i = 0; i < n; i++) {
     for (let j = i+1; j < n; j++) {
       const dx  = positions[j][0]-positions[i][0];
       const dy  = positions[j][1]-positions[i][1];
@@ -319,6 +451,30 @@ function computeAcc(positions, masses, charges) {
       }
     }
   }
+  } // end if (!realtime || mode !== 'gravity')
+
+  // NFW dark matter halo (Galaxy Core preset, toggled by cfg.haloOn).
+  // Analytic acceleration from the NFW density profile ρ(r) = ρ_s / [(r/rs)(1+r/rs)²].
+  // Enclosed mass M(r) = M_halo × [ln(1 + r/rs) − (r/rs)/(1 + r/rs)].
+  // Radial acceleration: a_NFW(r) = −G × M(r) / r² (directed toward BH center).
+  // Reference: Navarro, Frenk & White (1996), ApJ 462:563; (1997), ApJ 490:493.
+  if (mode === 'gravity' && cfg.haloOn) {
+    const rs = cfg.haloRs, Mh = cfg.haloMass;
+    const [bx,by,bz] = cfg.bhPos;
+    for (let i = 0; i < n; i++) {
+      const dx = bx - positions[i][0], dy = by - positions[i][1], dz = bz - positions[i][2];
+      const r2 = dx*dx + dy*dy + dz*dz;
+      if (r2 < 1e-10) continue;
+      const r   = Math.sqrt(r2);
+      const x   = r / rs;
+      // Enclosed mass fraction: [ln(1+x) − x/(1+x)]
+      const Menc = Mh * (Math.log(1 + x) - x / (1 + x));
+      const a    = G * Menc / r2;  // acceleration magnitude
+      acc[i][0] += a * dx / r;
+      acc[i][1] += a * dy / r;
+      acc[i][2] += a * dz / r;
+    }
+  }
 
   // Black hole gravity (gravity mode only) with 1PN post-Newtonian correction.
   // F_BH = F_Newton × (1 + 3v²/cSim² + 3GM/(r·cSim²))
@@ -328,7 +484,7 @@ function computeAcc(positions, masses, charges) {
   //   • perihelion precession for bodies in elliptic orbits near the BH
   //   • bodies inside r_ISCO = 3·rs lose angular-momentum support and spiral in
   //
-  // Reference: Misner, Thorne & Wheeler §25.5 (geodesic deviation, weak-field limit)
+  // Reference: Misner, Thorne & Wheeler Ch. 25 (Schwarzschild timelike geodesics, 1PN effective force).
   if (mode === 'gravity' && centralOn && blackHole) {
     const [bx,by,bz] = cfg.bhPos, bm = blackHole.mass;
     const rs    = blackHole.radii().eventHorizon;  // visual event-horizon radius (AU)
@@ -375,7 +531,7 @@ async function computeAccDispatch(positions, masses, charges) {
 // kick larger than escape velocity. Adaptive substepping forces dt to shrink
 // during the close approach and restores energy conservation.
 //
-// Reference: Aarseth 2003, "Gravitational N-Body Simulations", §2.1 block timesteps.
+// Reference: Aarseth 2003, "Gravitational N-Body Simulations", §2.6 (block timesteps).
 // We use a global (not per-particle) step because Velocity Verlet breaks
 // symplecticity when the step varies per particle.
 
@@ -454,7 +610,8 @@ function estimateSubstepDt(positions, masses, dtRemaining) {
   }
 
   diag.rmin = Math.sqrt(rmin);
-  if (highN) minDt = Math.max(minDt, dtRemaining / 4);
+  // No floor on minDt here — Barnes-Hut makes each substep cheap enough that
+  // close encounters can take as many substeps as the adaptive criterion needs.
   return Math.max(MIN_DT, Math.min(minDt, dtRemaining));
 }
 
@@ -463,10 +620,11 @@ async function timestep() {
 
   const outerDt = cfg.dt;
   const tEnd    = simTime + outerDt;
+  // Barnes-Hut makes per-substep cost O(N log N), so we no longer cap substeps
+  // for large N. Let the adaptive timestep criterion drive how many are needed.
   const maxSubsteps =
-    approximationActiveFor(bodies.length) ? 1 :
     cfg.integratorMode === 'high_accuracy' ? MAX_SUBSTEPS_PER_FRAME :
-    bodies.length > HIGH_N_LIMIT ? 4 : MAX_SUBSTEPS_PER_FRAME;
+    bodies.length > HIGH_N_LIMIT ? 64 : MAX_SUBSTEPS_PER_FRAME;
   let substeps  = 0;
   diag.maxSubstepsHit = false;
 
@@ -640,6 +798,9 @@ function handleBHAbsorption() {
 }
 
 // ── Photon Geodesics ──────────────────────────────────────────
+// Integrates the Schwarzschild null geodesic (Binet) equation:
+//   d²u/dφ² + u = (3rs/2)u²   where u = 1/r, rs = 2GM/c²
+// Reference: Misner, Thorne & Wheeler §25.6 (orbit of a photon in Schwarzschild geometry).
 function updatePhotons() {
   if (!photonsOn || !centralOn || !blackHole || !photons.length) return;
   const bm    = blackHole.mass;
@@ -679,30 +840,70 @@ function updatePhotons() {
   }
 }
 
-function spawnPhotons(camPos, camDir) {
-  if (!centralOn || !blackHole) return;
-  photons = [];
+// Shared helper: given a start position and direction, compute initial Photon state.
+function _photonFromRay(camPos, ndir) {
+  const x0   = add3(camPos, scale3(ndir, 0.2));
+  const rvec = sub3(x0, cfg.bhPos);
+  const r0   = norm3(rvec) + 1e-12;
+  const er0  = unit3(rvec);
+
+  let h = cross3(rvec, ndir);
+  if (norm3(h) < 1e-12) h = cross3(er0, [0, 0, 1]);
+  if (norm3(h) < 1e-12) h = cross3(er0, [0, 1, 0]);
+  h = unit3(h);
+  const et0 = unit3(cross3(h, er0));
+
+  const n_r  = dot3(ndir, er0);
+  const n_t  = dot3(ndir, et0);
+  const bImp = Math.max(1e-6, r0 * Math.abs(n_t));
+  const u    = 1 / r0;
+  const up   = Math.abs(n_t) >= 1e-8 ? -n_r / (r0 * n_t) : -Math.sign(n_r) * 1e3;
+  return new Photon(u, up, 0, bImp, er0, et0);
+}
+
+// Cone mode: scatter N_photons randomly within beamSpread around the BH direction.
+// Good for general exploration, but randomly misses the photon sphere (b ≈ b_cr).
+function spawnPhotonsCone(camPos) {
   const aim = unit3(sub3(cfg.bhPos, camPos));
   for (let i = 0; i < cfg.N_photons; i++) {
     const spread = randUnitVec().map(v => v * cfg.beamSpread * 2.4);
     const ndir   = unit3(add3(aim, spread));
-    const x0     = add3(camPos, scale3(ndir, 0.2));
-    const rvec   = sub3(x0, cfg.bhPos);
-    const r0     = norm3(rvec) + 1e-12;
-    const er0    = unit3(rvec);
+    photons.push(_photonFromRay(camPos, ndir));
+  }
+}
 
-    let h = cross3(rvec, ndir);
-    if (norm3(h) < 1e-12) h = cross3(er0, [0,0,1]);
-    if (norm3(h) < 1e-12) h = cross3(er0, [0,1,0]);
-    h = unit3(h);
-    const et0 = unit3(cross3(h, er0));
+// Image-plane scan mode: uniformly sample impact parameters b from 0 to
+// cfg.imagePlaneWidth × b_cr (the photon sphere critical impact parameter).
+// Produces a systematic fan that reveals the photon sphere, Einstein ring,
+// and b-deflection relationship without depending on camera aim or luck.
+// Reference: b_cr = 3√3/2 × r_s ≈ 2.598 × r_s (Misner, Thorne & Wheeler §25.6).
+function spawnPhotonsImagePlane(camPos) {
+  const aim  = unit3(sub3(cfg.bhPos, camPos));
+  // Build two axes perpendicular to the camera-BH axis (the image plane axes).
+  let uPerp = cross3(aim, [0, 0, 1]);
+  if (norm3(uPerp) < 1e-6) uPerp = cross3(aim, [0, 1, 0]);
+  uPerp = unit3(uPerp);
 
-    const n_r = dot3(ndir, er0);
-    const n_t = dot3(ndir, et0);
-    const bImp = Math.max(1e-6, r0 * Math.abs(n_t));
-    const u    = 1 / r0;
-    const up   = Math.abs(n_t) >= 1e-8 ? -n_r / (r0 * n_t) : -Math.sign(n_r) * 1e3;
-    photons.push(new Photon(u, up, 0, bImp, er0, et0));
+  const bCrit = blackHole.radii().shadow;  // photon sphere critical impact param
+  const bMax  = cfg.imagePlaneWidth * bCrit;
+  const n     = cfg.N_photons;
+  for (let i = 0; i < n; i++) {
+    // Uniform spacing: photons at b = bMax × (i + 0.5) / n
+    // Offset by 0.5 so no photon starts exactly at b = 0 (would hit BH instantly).
+    const b       = bMax * (i + 0.5) / n;
+    const target  = add3(cfg.bhPos, scale3(uPerp, b));
+    const ndir    = unit3(sub3(target, camPos));
+    photons.push(_photonFromRay(camPos, ndir));
+  }
+}
+
+function spawnPhotons(camPos, camDir) {
+  if (!centralOn || !blackHole) return;
+  photons = [];
+  if (cfg.photonMode === 'image_plane') {
+    spawnPhotonsImagePlane(camPos);
+  } else {
+    spawnPhotonsCone(camPos);
   }
 }
 
@@ -746,6 +947,43 @@ function recenterGeneratedBodies() {
 }
 
 // Gravity: random sphere, optional BH orbital velocity
+// Rescale all body velocities so Q = 2KE/|PE| = 1 at t=0 (virial equilibrium).
+// Only called when cfg.virialEquil = true. Requires bodies[] already populated.
+// Reference: Binney & Tremaine (2008), §4.8; also used in REBOUND and McLuster.
+function rescaleToVirialEquilibrium() {
+  let ke = 0, pe = 0;
+  const n = bodies.length;
+  const eps2 = cfg.eps * cfg.eps;
+  for (let i = 0; i < n; i++) {
+    const v = bodies[i].vel;
+    ke += 0.5 * bodies[i].mass * (v[0]*v[0] + v[1]*v[1] + v[2]*v[2]);
+    for (let j = i + 1; j < n; j++) {
+      const dx = bodies[j].pos[0] - bodies[i].pos[0];
+      const dy = bodies[j].pos[1] - bodies[i].pos[1];
+      const dz = bodies[j].pos[2] - bodies[i].pos[2];
+      const r  = Math.sqrt(dx*dx + dy*dy + dz*dz + eps2);
+      pe -= G * bodies[i].mass * bodies[j].mass / r;
+    }
+    // Include BH gravitational PE if present
+    if (centralOn && blackHole) {
+      const dx = blackHole.pos[0] - bodies[i].pos[0];
+      const dy = blackHole.pos[1] - bodies[i].pos[1];
+      const dz = blackHole.pos[2] - bodies[i].pos[2];
+      const r  = Math.sqrt(dx*dx + dy*dy + dz*dz + eps2);
+      pe -= G * blackHole.mass * bodies[i].mass / r;
+    }
+  }
+  // Q = 2KE/|PE| should equal 1; scale all velocities by sqrt(|PE| / (2KE))
+  if (ke > 0 && pe < 0 && isFinite(ke) && isFinite(pe)) {
+    const scale = Math.sqrt(Math.abs(pe) / (2 * ke));
+    for (let i = 0; i < n; i++) {
+      bodies[i].vel[0] *= scale;
+      bodies[i].vel[1] *= scale;
+      bodies[i].vel[2] *= scale;
+    }
+  }
+}
+
 function generateGravityBodies(n) {
   bodies = [];
   const vmax = safeVmax() * cfg.velFactor;
@@ -759,6 +997,7 @@ function generateGravityBodies(n) {
     bodies.push(new Body(pos, vel, mass, randomColor(), 0));
   }
   recenterGeneratedBodies();
+  if (cfg.virialEquil) rescaleToVirialEquilibrium();
 }
 
 // Coulomb: 1 nucleus (charge +nElec, mass 1836) + (n−1) electrons in circular orbits
@@ -873,6 +1112,9 @@ function _presetGalaxyCore() {
   cfg.bhMass = 200;
   centralOn = true;
   blackHole = new BlackHole(200, [0, 0, 0]);
+  // NFW halo defaults for galaxy-scale setup (toggle via UI to demonstrate dark matter).
+  // haloRs = 3 AU (scale radius); haloMass = 500 (≫ BH at large r → flat rotation curve).
+  cfg.haloOn = false; cfg.haloRs = 3.0; cfg.haloMass = 500;
   for (let i = 0; i < 40; i++) {
     const r = 1.5 + rand() * 7;  // 1.5–8.5 AU
     const theta = rand() * 2 * Math.PI;
@@ -1063,6 +1305,7 @@ function loadPreset(name) {
   centralOn = false;
   blackHole = null;
   photonsOn = false;
+  cfg.haloOn = false;  // halo is Galaxy Core-specific; always reset on preset switch
   photons   = [];
   simTime   = 0;
   recordRows = []; recordCount = 0;
@@ -1151,6 +1394,11 @@ function computeDiagnostics() {
   }
 
   const E = ke + pe;
+  // Virial ratio: Q = 2KE/|PE|. Q = 1 at virial equilibrium (Binney & Tremaine §4.8).
+  // Only meaningful for gravitationally bound systems (pe < 0).
+  diag.virialQ = (pe < 0 && isFinite(pe) && isFinite(ke))
+    ? +(2 * ke / Math.abs(pe)).toFixed(4)
+    : null;
   diag.energy = E;
   diag.px = px; diag.py = py; diag.pz = pz;
   diag.Lx = Lx; diag.Ly = Ly; diag.Lz = Lz;
@@ -1172,7 +1420,7 @@ function getState(includeTrails) {
   return {
     t: +simTime.toFixed(5),
     events: pendingEvents.splice(0),  // flush — consumed once by the UI
-    running, central_on: centralOn, photons_on: photonsOn,
+    running, central_on: centralOn, photons_on: photonsOn, halo_on: cfg.haloOn,
     energy: +energyCache.toFixed(4),
     body_count: bodies.length,
     selected_index: sel,
@@ -1191,6 +1439,7 @@ function getState(includeTrails) {
       substeps:      diag.substeps,
       maxSubstepsHit:diag.maxSubstepsHit,
       rmin:          isFinite(diag.rmin) ? +diag.rmin.toFixed(4) : null,
+      virialQ:       diag.virialQ,
       seed:          cfg.seed,
       eta:           cfg.eta,
       integratorMode: cfg.integratorMode,
@@ -1264,6 +1513,13 @@ self.onmessage = function({ data: msg }) {
     case 'set_mass_min':     cfg.massMin    = Math.max(0.1, Math.min(cfg.massMax-0.1, v)); break;
     case 'set_mass_max':     cfg.massMax    = Math.max(cfg.massMin+0.1, Math.min(50, v)); break;
     case 'set_vel_factor':   cfg.velFactor  = Math.max(0, Math.min(3, v)); break;
+    case 'set_virial_equil': cfg.virialEquil = !!v; break;
+    case 'toggle_halo':           cfg.haloOn = !cfg.haloOn; break;
+    case 'set_halo':              cfg.haloOn = !!v; break;
+    case 'set_halo_rs':           cfg.haloRs   = Math.max(0.1, Math.min(50, v)); break;
+    case 'set_halo_mass':         cfg.haloMass = Math.max(1, Math.min(50000, v)); break;
+    case 'set_photon_mode':       cfg.photonMode = (v === 'image_plane') ? 'image_plane' : 'cone'; break;
+    case 'set_image_plane_width': cfg.imagePlaneWidth = Math.max(1, Math.min(20, v)); break;
     case 'set_bh_mass':
       cfg.bhMass = Math.max(10, Math.min(5000, v));
       if (blackHole) blackHole.mass = cfg.bhMass;

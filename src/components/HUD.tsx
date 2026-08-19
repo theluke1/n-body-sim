@@ -140,9 +140,26 @@ export default function HUD({ snap, selectedBody }: Props) {
               {diagnostics.substeps}{diagnostics.maxSubstepsHit ? '*' : ''}
             </span>
             {diagnostics.rmin !== null && (
-              <> · Closest Approach r<sub>min</sub> = {diagnostics.rmin.toFixed(3)}</>
+              <> · r<sub>min</sub> = {diagnostics.rmin.toFixed(3)}</>
             )}
           </div>
+          {diagnostics.virialQ !== null && diagnostics.virialQ !== undefined && (
+            <div>
+              Q = 2K/|U| ={' '}
+              <span style={{
+                color: Math.abs(diagnostics.virialQ - 1) < 0.1
+                  ? 'var(--green)'
+                  : Math.abs(diagnostics.virialQ - 1) < 0.5
+                    ? 'var(--amber)'
+                    : 'var(--red)',
+              }}>
+                {diagnostics.virialQ.toFixed(3)}
+              </span>
+              <span style={{ color: 'var(--text-dim)', fontSize: 13 }}>
+                {Math.abs(diagnostics.virialQ - 1) < 0.1 ? ' (equilibrium)' : ''}
+              </span>
+            </div>
+          )}
           <div style={{ color: 'var(--text-dim)', marginTop: 3 }}>
             E = K + U · L = r × p · seed {diagnostics.seed.toString(16)}
           </div>
