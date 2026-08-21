@@ -1,0 +1,613 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gravity Lens Lab — Design Process</title>
+  <style>
+    :root {
+      --bg:        #08090f;
+      --surface:   #0f1118;
+      --border:    #1e2130;
+      --blue:      #4c9fff;
+      --blue-dim:  #2a5a99;
+      --cyan:      #4cf0e0;
+      --amber:     #f0b940;
+      --green:     #4cde96;
+      --red:       #f05060;
+      --purple:    #b06cf0;
+      --text:      #d8dce8;
+      --text-dim:  #7a8099;
+      --font-body: 'Georgia', serif;
+      --font-ui:   'Inter', 'Segoe UI', system-ui, sans-serif;
+      --font-mono: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font-body);
+      font-size: 16px;
+      line-height: 1.75;
+    }
+
+    /* ── Nav ── */
+    nav {
+      position: sticky; top: 0; z-index: 100;
+      background: rgba(8,9,15,0.92);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+      padding: 0 32px;
+      display: flex; align-items: center; gap: 24px;
+      height: 52px;
+      font-family: var(--font-ui); font-size: 12px;
+      letter-spacing: 0.08em; color: var(--text-dim);
+    }
+    nav .brand { color: var(--blue); font-weight: 700; font-size: 13px; margin-right: 8px; }
+    nav a { color: var(--text-dim); text-decoration: none; white-space: nowrap; }
+    nav a:hover { color: var(--text); }
+    nav .links { display: flex; gap: 20px; }
+    nav .live {
+      margin-left: auto;
+      color: var(--blue); font-weight: 600; white-space: nowrap;
+      text-decoration: none;
+    }
+
+    /* ── Layout ── */
+    .page { max-width: 820px; margin: 0 auto; padding: 64px 32px 120px; }
+
+    /* ── Hero ── */
+    .hero { margin-bottom: 56px; }
+    .hero .eyebrow {
+      font-family: var(--font-mono); font-size: 11px;
+      color: var(--cyan); letter-spacing: 0.18em;
+      text-transform: uppercase; margin-bottom: 16px;
+    }
+    .hero h1 {
+      font-family: var(--font-ui); font-size: 2.4rem; font-weight: 700;
+      color: #fff; line-height: 1.18; margin-bottom: 20px;
+    }
+    .hero p {
+      font-size: 1.05rem; color: var(--text-dim); max-width: 640px; line-height: 1.7;
+    }
+    .hero-links { display: flex; gap: 12px; margin-top: 28px; flex-wrap: wrap; }
+    .btn {
+      display: inline-flex; align-items: center; gap: 6px;
+      font-family: var(--font-ui); font-size: 13px; font-weight: 600;
+      padding: 8px 18px; border-radius: 6px; text-decoration: none;
+      letter-spacing: 0.04em;
+    }
+    .btn-primary { background: var(--blue); color: #fff; }
+    .btn-secondary {
+      background: transparent; color: var(--text);
+      border: 1px solid var(--border);
+    }
+    .btn-secondary:hover { border-color: var(--text-dim); }
+
+    /* ── Phase timeline ── */
+    .phase {
+      border-left: 2px solid var(--border);
+      padding-left: 28px;
+      margin-bottom: 56px;
+      position: relative;
+    }
+    .phase::before {
+      content: '';
+      position: absolute; left: -6px; top: 6px;
+      width: 10px; height: 10px; border-radius: 50%;
+      background: var(--blue); border: 2px solid var(--bg);
+    }
+    .phase-label {
+      font-family: var(--font-mono); font-size: 10px;
+      color: var(--blue); letter-spacing: 0.18em;
+      text-transform: uppercase; margin-bottom: 8px;
+    }
+    .phase h2 {
+      font-family: var(--font-ui); font-size: 1.35rem; font-weight: 700;
+      color: #fff; margin-bottom: 16px;
+    }
+    .phase p { color: var(--text-dim); margin-bottom: 14px; }
+    .phase p:last-child { margin-bottom: 0; }
+
+    /* ── Section header (outside phase) ── */
+    h2.section {
+      font-family: var(--font-ui); font-size: 1.35rem; font-weight: 700;
+      color: #fff; margin: 56px 0 20px;
+    }
+    p.body { color: var(--text-dim); margin-bottom: 14px; }
+
+    /* ── Callout boxes ── */
+    .callout {
+      border-radius: 8px; padding: 18px 22px;
+      margin: 22px 0; font-size: 0.92rem; line-height: 1.65;
+    }
+    .callout-blue  { background: #0d1a2e; border-left: 3px solid var(--blue);  color: var(--text); }
+    .callout-amber { background: #1f1700; border-left: 3px solid var(--amber); color: var(--text); }
+    .callout-green { background: #061a10; border-left: 3px solid var(--green); color: var(--text); }
+    .callout-red   { background: #1f0508; border-left: 3px solid var(--red);   color: var(--text); }
+    .callout strong { color: inherit; font-weight: 600; }
+
+    /* ── Decision table ── */
+    .decision-list { list-style: none; margin: 20px 0; }
+    .decision-list li {
+      padding: 14px 0;
+      border-bottom: 1px solid var(--border);
+      display: grid; grid-template-columns: 120px 1fr;
+      gap: 16px; font-size: 0.91rem;
+    }
+    .decision-list li:last-child { border-bottom: none; }
+    .decision-label {
+      font-family: var(--font-mono); font-size: 10px;
+      color: var(--cyan); letter-spacing: 0.12em;
+      text-transform: uppercase; padding-top: 2px;
+    }
+    .decision-text { color: var(--text-dim); line-height: 1.6; }
+    .decision-text strong { color: var(--text); }
+
+    /* ── Result pills ── */
+    .result-row { display: flex; gap: 12px; flex-wrap: wrap; margin: 18px 0; }
+    .result-pill {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 6px; padding: 10px 16px; font-size: 0.85rem;
+    }
+    .result-pill .val {
+      font-family: var(--font-mono); font-size: 1rem; font-weight: 700;
+      color: var(--green); display: block; margin-bottom: 2px;
+    }
+    .result-pill .lbl { color: var(--text-dim); }
+
+    /* ── Fix list ── */
+    .fix-grid { margin: 20px 0; }
+    .fix-item {
+      display: grid; grid-template-columns: 28px 1fr;
+      gap: 12px; padding: 12px 0;
+      border-bottom: 1px solid var(--border);
+      font-size: 0.91rem;
+    }
+    .fix-item:last-child { border-bottom: none; }
+    .fix-num {
+      font-family: var(--font-mono); font-size: 11px;
+      color: var(--blue); font-weight: 700; padding-top: 2px;
+    }
+    .fix-text { color: var(--text-dim); line-height: 1.6; }
+    .fix-text strong { color: var(--text); }
+
+    /* ── Takeaway cards ── */
+    .takeaway-grid {
+      display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+      gap: 16px; margin: 24px 0;
+    }
+    .takeaway-card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 8px; padding: 18px;
+    }
+    .takeaway-card .icon { font-size: 1.3rem; margin-bottom: 10px; }
+    .takeaway-card h4 {
+      font-family: var(--font-ui); font-size: 0.88rem; font-weight: 700;
+      color: #fff; margin-bottom: 8px;
+    }
+    .takeaway-card p { font-size: 0.84rem; color: var(--text-dim); line-height: 1.6; }
+
+    /* ── Footer ── */
+    footer {
+      border-top: 1px solid var(--border); padding-top: 32px; margin-top: 80px;
+      font-family: var(--font-ui); font-size: 12px; color: var(--text-dim);
+      display: flex; gap: 24px; flex-wrap: wrap; align-items: center;
+    }
+    footer a { color: var(--blue); text-decoration: none; }
+    footer a:hover { text-decoration: underline; }
+
+    @media (max-width: 600px) {
+      .page { padding: 40px 20px 80px; }
+      .hero h1 { font-size: 1.75rem; }
+      nav .links { display: none; }
+      .decision-list li { grid-template-columns: 1fr; gap: 4px; }
+    }
+  </style>
+</head>
+<body>
+
+<nav>
+  <span class="brand">Gravity Lens Lab</span>
+  <div class="links">
+    <a href="#audit">Physics Audit</a>
+    <a href="#fixes">The Fixes</a>
+    <a href="#visual">Visual Design</a>
+    <a href="#ml">ML Layer</a>
+    <a href="#takeaways">Takeaways</a>
+  </div>
+  <a class="live" href="https://gravitylenslab.netlify.app" target="_blank">▶ Live Demo ↗</a>
+</nav>
+
+<div class="page">
+
+  <!-- ── Hero ── -->
+  <div class="hero">
+    <div class="eyebrow">Design Process</div>
+    <h1>How Gravity Lens Lab<br>Was Built and Why</h1>
+    <p>
+      A walkthrough of every major decision made during development — what was broken,
+      how it was found, what was changed and why, and what the process looked like from
+      the inside.
+    </p>
+    <div class="hero-links">
+      <a class="btn btn-primary" href="https://gravitylenslab.netlify.app" target="_blank">▶ Live Demo</a>
+      <a class="btn btn-secondary" href="case-study.html" target="_blank">Technical Case Study</a>
+      <a class="btn btn-secondary" href="https://github.com/theluke1/n-body-sim" target="_blank">GitHub ↗</a>
+    </div>
+  </div>
+
+  <!-- ── Phase 0: Starting Point ── -->
+  <div class="phase" id="start">
+    <div class="phase-label">Phase 0</div>
+    <h2>The Starting Point</h2>
+    <p>
+      The simulator already existed: a browser-based N-body gravity engine running in a Web
+      Worker, rendered in Three.js with a custom Schwarzschild lensing shader and multiple
+      physics presets. It looked polished and ran smoothly. The problem was that several things
+      described in the code as physically accurate were not.
+    </p>
+    <p>
+      The goal going into this project was to turn an impressive-looking simulation into one
+      that could actually be defended in a technical interview — where every physics claim is
+      cited, every number is independently verified, and the architecture decisions have explicit
+      reasoning behind them.
+    </p>
+
+    <div class="callout callout-amber">
+      <strong>The gap:</strong> Looking correct and being correct are different things. A simulation
+      can produce beautiful orbits while using wrong algorithms — and the wrong algorithms only
+      reveal themselves when you read the underlying physics literature carefully.
+    </div>
+  </div>
+
+  <!-- ── Phase 1: Physics Audit ── -->
+  <div class="phase" id="audit">
+    <div class="phase-label">Phase 1</div>
+    <h2>The Physics Audit</h2>
+    <p>
+      Every physics claim in the code was extracted and checked against a primary source —
+      not a blog post or Wikipedia, but the actual papers and textbooks the algorithms come from.
+      The audit covered 13 distinct claims across five physical systems.
+    </p>
+    <p>
+      The sources used were: <em>GADGET-2</em> (Springel 2005) for the N-body integrator,
+      Aarseth (2003) <em>Gravitational N-Body Simulations</em> for the adaptive timestep,
+      Misner, Thorne &amp; Wheeler (1973) §25.6 for the Schwarzschild photon geodesic,
+      Hernquist (1987, 1993) for Barnes-Hut force error bounds,
+      and Navarro, Frenk &amp; White (1996/1997) for the dark matter halo potential.
+    </p>
+
+    <div class="callout callout-red">
+      <strong>Key finding:</strong> The code called a force approximation "Barnes-Hut" —
+      but it was actually a single mean-field force pointing toward the system's center of mass.
+      This is O(1) per body, not O(N log N), and it eliminates all particle-particle dynamics.
+      A real Barnes-Hut octree had never been implemented.
+    </div>
+
+    <p>
+      Four additional claims were wrong or imprecise. Code comment section references were
+      incorrect. The default opening angle θ was documented as 0.5 (Hernquist) but should
+      have been 0.7 (GADGET-2's production default). The Aarseth adaptive timestep formula
+      referenced the wrong equation in the textbook.
+    </p>
+    <p>
+      Two claims flagged as uncertain were resolved by writing independent benchmarks.
+    </p>
+  </div>
+
+  <!-- ── Phase 2: The Six Fixes ── -->
+  <div class="phase" id="fixes">
+    <div class="phase-label">Phase 2</div>
+    <h2>The Six Fixes</h2>
+
+    <div class="fix-grid">
+      <div class="fix-item">
+        <div class="fix-num">01</div>
+        <div class="fix-text">
+          <strong>Barnes-Hut octree (replaces mean-field monopole)</strong><br>
+          Genuine O(N log N) 3D octree with configurable opening angle θ.
+          Default θ = 0.7 matching GADGET-2. The old mean-field code path was deleted entirely.
+        </div>
+      </div>
+      <div class="fix-item">
+        <div class="fix-num">02</div>
+        <div class="fix-text">
+          <strong>Adaptive substep cap raised</strong><br>
+          A hard limit of 1 adaptive substep per frame (for N > 120) was preventing
+          close-encounter resolution. Raised to 64, allowing the Aarseth criterion
+          to run at full resolution.
+        </div>
+      </div>
+      <div class="fix-item">
+        <div class="fix-num">03</div>
+        <div class="fix-text">
+          <strong>Virial ratio Q broadcast live</strong><br>
+          Q = 2KE / |PE| was computed but never displayed. Added to the diagnostics
+          broadcast so users can see whether the system is in virial equilibrium.
+        </div>
+      </div>
+      <div class="fix-item">
+        <div class="fix-num">04</div>
+        <div class="fix-text">
+          <strong>Opt-in virial equilibration at spawn</strong><br>
+          Random body spawn produces arbitrary Q. An opt-in flag rescales all velocities
+          by √(|PE|/2KE) at spawn so Q = 1 exactly. Default off — preserving the
+          interesting out-of-equilibrium dynamics as the default experience.
+        </div>
+      </div>
+      <div class="fix-item">
+        <div class="fix-num">05</div>
+        <div class="fix-text">
+          <strong>NFW dark matter halo potential</strong><br>
+          Galaxy Core preset had Keplerian orbits (v ∝ 1/√r). Added analytic NFW halo
+          acceleration so users can toggle the halo and watch the rotation curve shift
+          from Keplerian to flat — directly demonstrating dark matter dynamics.
+          Source: Navarro, Frenk &amp; White (1996/1997).
+        </div>
+      </div>
+      <div class="fix-item">
+        <div class="fix-num">06</div>
+        <div class="fix-text">
+          <strong>Image-plane photon scan mode</strong><br>
+          Photons previously spawned in a cone from the camera. Added an image-plane
+          mode that spawns photons with uniformly spaced impact parameters perpendicular
+          to the camera–BH axis, directly revealing the photon sphere and Einstein ring geometry.
+        </div>
+      </div>
+    </div>
+
+    <div class="callout callout-blue">
+      <strong>Integration note:</strong> The physics engine uses adaptive-substep Velocity Verlet
+      (Störmer-Verlet), which is a symplectic integrator — it conserves a shadow Hamiltonian
+      indefinitely, preventing the secular energy drift that affects non-symplectic methods like
+      RK4. The same integrator class (leapfrog) is used in HMC sampling in probabilistic
+      ML frameworks (PyMC, Stan) for the same reason.
+    </div>
+  </div>
+
+  <!-- ── Phase 3: Verification ── -->
+  <div class="phase" id="verification">
+    <div class="phase-label">Phase 3</div>
+    <h2>Verification by Independent Benchmark</h2>
+    <p>
+      Every major physics fix was validated by an independent Python script — not unit tests
+      of the code, but independent numerical experiments that should produce the same results
+      if the physics is correct. All scripts are in <code style="font-family:var(--font-mono);font-size:0.88em;color:var(--cyan)">benchmarks/</code>.
+    </p>
+
+    <div class="result-row">
+      <div class="result-pill">
+        <span class="val">15×</span>
+        <span class="lbl">RK4 energy drift vs VV<br><small style="color:var(--text-dim)">at step 10,000</small></span>
+      </div>
+      <div class="result-pill">
+        <span class="val">1.77%</span>
+        <span class="lbl">Mean force error at θ=0.7<br><small style="color:var(--text-dim)">vs exact O(N²)</small></span>
+      </div>
+      <div class="result-pill">
+        <span class="val">2.27°</span>
+        <span class="lbl">Photon deflection at b=20b<sub>cr</sub><br><small style="color:var(--text-dim)">GR predicts 2.21°</small></span>
+      </div>
+      <div class="result-pill">
+        <span class="val">2.09×</span>
+        <span class="lbl">v<sub>total</sub>/v<sub>Kepler</sub> at r=25 AU<br><small style="color:var(--text-dim)">flat rotation curve</small></span>
+      </div>
+    </div>
+
+    <p>
+      The photon deflection benchmark was the most technically difficult. Near the photon sphere
+      (b ≈ b<sub>cr</sub>), photons can orbit the black hole multiple times before escaping,
+      making ODE exit detection unreliable — the trajectory has a fractal boundary structure.
+      The solution was to switch from ODE integration to the exact orbit integral formulation
+      using <code style="font-family:var(--font-mono);font-size:0.88em;color:var(--cyan)">scipy.integrate.quad</code>,
+      which avoids exit detection entirely and produces exact results.
+    </p>
+
+    <div class="callout callout-green">
+      <strong>Key principle:</strong> The benchmark scripts are intentionally independent of the
+      simulator's own code. They re-implement the physics from first principles. If both
+      produce the same number, that's evidence the simulator is correct — not circular validation.
+    </div>
+  </div>
+
+  <!-- ── Phase 4: Visual Design ── -->
+  <div class="phase" id="visual">
+    <div class="phase-label">Phase 4</div>
+    <h2>Visual Design — Diagnosing the Rendering Bug</h2>
+    <p>
+      After the physics was verified, a visual anomaly was identified: bodies passing below
+      the black hole showed a characteristic kink in their trail — sharp descent, a flat
+      segment, then the path shooting back upward. Bodies above the BH looked correct.
+      The asymmetry persisted across all accuracy modes.
+    </p>
+
+    <div class="callout callout-amber">
+      <strong>The clue:</strong> Rotating the camera did not change which side the kink appeared on.
+      The anomaly was always on the world-space bottom (−Y), not the screen-space bottom.
+      That ruled out a rendering projection issue and pointed to a world-space displacement.
+    </div>
+
+    <p>
+      The cause: body positions and trail vertices were being displaced toward the BH
+      using a "funnel dip" formula based on XZ-plane distance only. The displacement was
+      always applied in the −Y world direction — correct for bodies above the BH (which
+      get pulled downward toward it), but wrong for bodies below it (which get pulled
+      further away from the BH, creating the kink).
+    </p>
+    <p>
+      The fix attempted was to change the displacement direction to point toward the BH
+      center in 3D. But this exposed the deeper issue: the Schwarzschild lensing
+      <code style="font-family:var(--font-mono);font-size:0.88em;color:var(--cyan)">ShaderPass</code>
+      was already doing this job — correctly, per-pixel, using the actual Binet geodesic.
+      The body displacement was redundant. Two competing visual systems were producing
+      inconsistent results.
+    </p>
+
+    <div class="callout callout-blue">
+      <strong>Decision (DD-004):</strong> Remove the body/trail displacement entirely.
+      Physics positions are shown as raw world-space coordinates. The lensing shader
+      is the sole source of visual warping — it was already physically correct and
+      camera-angle-dependent by construction.
+    </div>
+
+    <p>
+      With the redundant layer removed, the remaining question was why the star lensing
+      looked blurry. The answer: the CubeCamera used for off-screen lensed rays was
+      only 256×256. Upgraded to 512×512. Star count increased from 5,000 to 12,000,
+      point size from 0.7 to 1.4, and the photon ring sharpened (RING_W 0.07→0.05,
+      RING_INT 3.5→5.0) to make the lensing effects actually visible.
+    </p>
+
+    <p>
+      The visual grid (the Flamm's paraboloid spacetime funnel) was left unchanged —
+      it correctly visualizes the embedding diagram of the Schwarzschild equatorial plane,
+      and its own vertex shader uses XZ-plane distance appropriately because the grid
+      itself lives in that plane.
+    </p>
+  </div>
+
+  <!-- ── Phase 5: ML Layer ── -->
+  <div class="phase" id="ml">
+    <div class="phase-label">Phase 5</div>
+    <h2>The ML Layer — Simulation as Data Generator</h2>
+    <p>
+      Rather than adding ML as a separate unrelated component, the orbit stability classifier
+      uses the physics engine itself as the data source. 3,000 random 3-body simulations
+      were generated using the same Velocity Verlet integrator, each labeled by outcome:
+      stable triple (79.6%), binary + escapee (17.0%), dissolved (3.4%).
+    </p>
+    <p>
+      Features were extracted from the initial state — Q_init, minimum and maximum
+      separation, mass ratio, angular momentum, specific energy, velocity spread.
+      These are physics-informed features: they represent quantities that theoretically
+      predict stability.
+    </p>
+
+    <div class="result-row">
+      <div class="result-pill">
+        <span class="val">91.3%</span>
+        <span class="lbl">Random Forest test accuracy<br><small style="color:var(--text-dim)">(baseline: 79.6%)</small></span>
+      </div>
+      <div class="result-pill">
+        <span class="val">~35%</span>
+        <span class="lbl">Q_init Gini importance<br><small style="color:var(--text-dim)">top feature</small></span>
+      </div>
+      <div class="result-pill">
+        <span class="val">0.72</span>
+        <span class="lbl">F1 (binary+escape class)<br><small style="color:var(--text-dim)">hardest to classify</small></span>
+      </div>
+    </div>
+
+    <p>
+      The most important result: Q_init (virial ratio at t=0) is the dominant predictive
+      feature with ~35% Gini importance. This directly validates why broadcasting Q live
+      in the simulator's telemetry display is the most physically meaningful diagnostic —
+      the ML independently confirms it.
+    </p>
+    <p>
+      The binary + escapee class (F1 = 0.72) is the hardest to classify, which is physically
+      expected. The binary/escape boundary is the most chaotic outcome — small changes in
+      initial conditions can push either way — and no feature set cleanly separates it.
+    </p>
+    <div class="callout callout-blue">
+      <strong>Design choice:</strong> Scikit-learn only, no neural network. With 3,000 samples
+      across 7 features, gradient boosting already achieves 90.8%. A neural network would likely
+      overfit and offer no interpretability advantage. The physics-informed features make the
+      RF results explainable — which is the point.
+    </div>
+  </div>
+
+  <!-- ── Takeaways ── -->
+  <h2 class="section" id="takeaways">What the Process Showed</h2>
+
+  <div class="takeaway-grid">
+    <div class="takeaway-card">
+      <div class="icon">🔍</div>
+      <h4>Read the source</h4>
+      <p>Code comments referencing papers are not the same as reading the papers.
+         Four of 13 physics claims were wrong — not because of bad code, but
+         because they were never verified against the original source.</p>
+    </div>
+    <div class="takeaway-card">
+      <div class="icon">📐</div>
+      <h4>Verify independently</h4>
+      <p>Unit tests of your own code are circular. The benchmarks here re-implement
+         the physics from scratch. Agreement between two independent implementations
+         is actual evidence of correctness.</p>
+    </div>
+    <div class="takeaway-card">
+      <div class="icon">🧩</div>
+      <h4>Separate systems compete</h4>
+      <p>The body displacement bug came from two visual systems doing the same job.
+         The fix wasn't to make one more correct — it was to recognize the redundancy
+         and remove one entirely.</p>
+    </div>
+    <div class="takeaway-card">
+      <div class="icon">📊</div>
+      <h4>ML validates physics</h4>
+      <p>The orbit classifier didn't just add ML to a physics project. Q_init emerging
+         as the top feature independently confirmed that the virial ratio display
+         is the right diagnostic to show users.</p>
+    </div>
+    <div class="takeaway-card">
+      <div class="icon">📝</div>
+      <h4>Document for the interview</h4>
+      <p>The case study and this doc were written knowing that each section would
+         need to be explained verbally. If you can't describe a decision in two
+         sentences, you don't understand it yet.</p>
+    </div>
+    <div class="takeaway-card">
+      <div class="icon">🎯</div>
+      <h4>Specificity over coverage</h4>
+      <p>Six well-understood and well-cited fixes are stronger than twelve vague
+         improvements. Every number in this project traces back to a primary
+         source or an independent benchmark.</p>
+    </div>
+  </div>
+
+  <!-- ── Decision Summary ── -->
+  <h2 class="section">Key Design Decisions</h2>
+  <ul class="decision-list">
+    <li>
+      <div class="decision-label">DD-001</div>
+      <div class="decision-text">
+        <strong>3D octree, not quadtree.</strong> Simulation is fully 3D; quadtree only
+        works in 2D. Fast Multipole Method (O(N)) considered but deferred — overkill for N &lt; 500.
+      </div>
+    </li>
+    <li>
+      <div class="decision-label">DD-002</div>
+      <div class="decision-text">
+        <strong>Virial equilibration opt-in, not default.</strong> Out-of-equilibrium collapse
+        is physically interesting and educational. Forcing Q = 1 at spawn would remove it.
+        Users who want equilibrium can opt in.
+      </div>
+    </li>
+    <li>
+      <div class="decision-label">DD-003</div>
+      <div class="decision-text">
+        <strong>NFW halo gated to Galaxy Core preset.</strong> Only makes physical sense
+        at galaxy scale. Exposing it globally adds UI complexity without value in other presets.
+      </div>
+    </li>
+    <li>
+      <div class="decision-label">DD-004</div>
+      <div class="decision-text">
+        <strong>Remove body displacement; let lensing shader be the sole visual warping system.</strong>
+        The ShaderPass already integrates Binet geodesics per-pixel. A competing world-space
+        displacement produces inconsistencies. One correct system beats two competing ones.
+      </div>
+    </li>
+  </ul>
+
+  <footer>
+    <span>Luke Rapley — <a href="https://github.com/theluke1/n-body-sim">GitHub</a></span>
+    <a href="https://gravitylenslab.netlify.app">gravitylenslab.netlify.app</a>
+    <a href="case-study.html">Technical Case Study</a>
+  </footer>
+
+</div>
+</body>
+</html>
