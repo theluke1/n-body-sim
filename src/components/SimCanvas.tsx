@@ -273,7 +273,7 @@ const STAR_CUMULATIVE = STAR_WEIGHTS.reduce<number[]>(
   (a, w, i) => [...a, (a[i - 1] ?? 0) + w], []);
 
 function buildStarfield(): THREE.Points {
-  const N   = 5000;
+  const N   = 12000;
   const pos = new Float32Array(N * 3);
   const col = new Float32Array(N * 3);
 
@@ -313,8 +313,8 @@ function buildStarfield(): THREE.Points {
   geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
   geo.setAttribute('color',    new THREE.BufferAttribute(col, 3));
   return new THREE.Points(geo, new THREE.PointsMaterial({
-    size: 0.7, sizeAttenuation: true, vertexColors: true,
-    transparent: true, opacity: 0.95,
+    size: 1.4, sizeAttenuation: true, vertexColors: true,
+    transparent: true, opacity: 0.9,
   }));
 }
 
@@ -341,9 +341,9 @@ function buildStarfield(): THREE.Points {
 //   • Ghost disk blend 0.50 (vs 0.25)  • Mask 8×bc (vs 6×bc)
 function makeSchwarzschildLensPass(cubeRT: THREE.WebGLCubeRenderTarget, cinematic = false): ShaderPass {
   const STEPS         = cinematic ? 240 : 120;
-  const RING_W        = cinematic ? 0.032 : 0.07;
+  const RING_W        = cinematic ? 0.032 : 0.05;
   const RING_W2       = cinematic ? 0.022 : 0.04;
-  const RING_INT      = cinematic ? 5.5   : 3.5;
+  const RING_INT      = cinematic ? 5.5   : 5.0;
   const DOPPLER_POW   = cinematic ? 4.0   : 3.0;
   const GHOST_BLEND   = cinematic ? 0.50  : 0.25;
   const MASK_MULT     = cinematic ? 8.0   : 6.0;
@@ -588,10 +588,10 @@ function makeSchwarzschildLensPass(cubeRT: THREE.WebGLCubeRenderTarget, cinemati
 
 // ── Trail / body shader — funnel displacement ────────────────────────────────
 // Trails store raw world-space positions. This ShaderMaterial displaces each
-// vertex downward by the same gravitational-well formula as the grid, so trail
-// lines physically curve into the BH funnel without re-writing the position
-// buffer. All trail materials share the SAME four BH uniform objects — updating
-// bhFunnelUniforms once per frame propagates to every trail automatically.
+// vertex toward the BH center in 3D using the same dip magnitude as the grid
+// funnel (driven by XZ distance), so trail lines curve inward from any direction
+// rather than always downward. All trail materials share the SAME four BH uniform
+// objects — updating bhFunnelUniforms once per frame propagates to every trail.
 type BHFunnelUniforms = {
   uBHPos:       { value: THREE.Vector3 };
   uBHPresence:  { value: number };
@@ -620,14 +620,7 @@ function makeTrailMaterial(bhu: BHFunnelUniforms): THREE.ShaderMaterial {
       uniform float uFunnelRS;
       uniform float uFunnelScale;
       void main() {
-        vec3  pos  = position;
-        vec2  diff = vec2(pos.x - uBHPos.x, pos.z - uBHPos.z);
-        float r    = length(diff);
-        float rFlat = uFunnelRS * 5.0;
-        float rSafe = max(r, uFunnelRS);
-        float depth = uFunnelScale * max(1.0 / rSafe - 1.0 / rFlat, 0.0);
-        pos.y -= depth * uBHPresence;
-        gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
       }
     `,
     fragmentShader: /* glsl */`
@@ -972,7 +965,7 @@ export default function SimCanvas({ stateRef, onSelectBody, onSpawnPhotons, show
     // perspective each frame. The lens ShaderPass reads this as uEnvMap and
     // runs Binet geodesic integration per-pixel to produce the distorted
     // background, BH shadow, and photon ring.
-    const cubeRT = new THREE.WebGLCubeRenderTarget(256, {
+    const cubeRT = new THREE.WebGLCubeRenderTarget(512, {
       format: THREE.RGBAFormat,
       type:   THREE.UnsignedByteType,
       generateMipmaps: false,
@@ -1116,8 +1109,6 @@ export default function SimCanvas({ stateRef, onSelectBody, onSpawnPhotons, show
       const rawRS       = bh ? (bh.shadow_radius ?? (bh.event_horizon_radius ?? bh.radius) * 2.598076) : 1.0;
       const visualRS    = Math.min(rawRS, 18.0);
       const funnelScale = visualRS * 12.0;
-      const bhX         = bh ? bh.pos[0] : 0;
-      const bhZ         = bh ? bh.pos[2] : 0;
 
       // Update grid + trail shared funnel uniforms
       if (gridMatRef.current) {
@@ -1137,14 +1128,10 @@ export default function SimCanvas({ stateRef, onSelectBody, onSpawnPhotons, show
       const n = Math.min(bodies.length, MAX_BODIES);
       bodyGeo.setDrawRange(0, n);
       for (let i = 0; i < n; i++) {
-        const b  = bodies[i];
-        const dx = b.pos[0] - bhX;
-        const dz = b.pos[2] - bhZ;
-        const r  = Math.sqrt(dx * dx + dz * dz);
-        const rS = Math.max(r, visualRS);
-        const dip = funnelScale * Math.max(1.0 / rS - 1.0 / (visualRS * 5.0), 0.0) * bhPresence;
+        const b   = bodies[i];
+        // Raw physics positions — the lensing shader handles screen-space warping
         bodyPos[i * 3]     = b.pos[0];
-        bodyPos[i * 3 + 1] = b.pos[1] - dip;
+        bodyPos[i * 3 + 1] = b.pos[1];
         bodyPos[i * 3 + 2] = b.pos[2];
         resolveBodyColor(col, b.mass, b.color);
         bodyCol[i * 3]     = Math.min(col.r * 1.3 * bodyDim, 1);
