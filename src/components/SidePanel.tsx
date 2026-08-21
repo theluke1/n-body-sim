@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
+import { motion } from 'framer-motion';
 import type { UISnap } from '../hooks/useSimulation';
 import type { BodyState, SimConfig } from '../types';
 
@@ -153,8 +154,8 @@ function EnergySparkline({ drift }: { drift: number }) {
         style={{ width: '100%', height: 48, borderRadius: 3, background: 'rgba(0,0,0,0.35)', display: 'block' }}
       />
       <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 2 }}>
-        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--text-dim)' }}>older</span>
-        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--text-dim)' }}>now</span>
+        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-dim)' }}>older</span>
+        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-dim)' }}>now</span>
       </div>
     </div>
   );
@@ -181,19 +182,20 @@ export default function SidePanel({ open, snap, selectedBody, config, log, onSen
   const [tab, setTab] = useState<Tab>('telemetry');
 
   return (
-    <div style={{
-      position: 'absolute',
-      top: 0, right: 42, bottom: 0,
-      width: 380,
-      background: 'rgba(5,6,14,0.94)',
-      backdropFilter: 'blur(14px)',
-      borderLeft: '1px solid var(--border)',
-      transform: open ? 'translateX(0)' : 'translateX(100%)',
-      transition: 'transform 0.22s cubic-bezier(0.4,0,0.2,1)',
-      zIndex: 20,
-      display: 'flex', flexDirection: 'column',
-      overflow: 'hidden',
-    }}>
+    <motion.div
+      animate={{ x: open ? 0 : 380 }}
+      transition={{ type: 'spring', damping: 30, stiffness: 280 }}
+      style={{
+        position: 'absolute',
+        top: 0, left: 0, bottom: 0,
+        width: 380,
+        background: 'rgba(5,6,14,0.94)',
+        backdropFilter: 'blur(14px)',
+        borderLeft: '1px solid var(--border)',
+        display: 'flex', flexDirection: 'column',
+        overflow: 'hidden',
+      }}
+    >
 
       {/* Tab bar */}
       <div style={{
@@ -215,27 +217,27 @@ export default function SidePanel({ open, snap, selectedBody, config, log, onSen
           <div>
             {selectedBody ? (
               <>
-                <div style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--cyan)', letterSpacing: 2, marginBottom: 12 }}>
+                <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--cyan)', letterSpacing: 2, marginBottom: 12 }}>
                   ◉ BODY #{selectedBody.id}
                 </div>
                 <DataRow label="MASS"    value={`${selectedBody.mass.toFixed(4)} M☉`} color="var(--blue-light)" />
                 <DataRow label="SPEED"   value={`${speed(selectedBody).toFixed(4)} AU/yr`} color="var(--cyan)" />
                 <DataRow label="CHARGE"  value={selectedBody.charge.toFixed(3)} />
                 <DataRow label="RADIUS"  value={selectedBody.radius.toFixed(4)} />
-                <div style={{ marginTop: 12, marginBottom: 6, fontFamily: 'var(--font-mono)', fontSize: 8, color: 'var(--text-dim)', letterSpacing: 2 }}>
+                <div style={{ marginTop: 12, marginBottom: 6, fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-dim)', letterSpacing: 2 }}>
                   POSITION (AU)
                 </div>
                 {['X','Y','Z'].map((ax, i) => (
                   <DataRow key={ax} label={ax} value={selectedBody.pos[i].toFixed(5)} />
                 ))}
-                <div style={{ marginTop: 12, marginBottom: 6, fontFamily: 'var(--font-mono)', fontSize: 8, color: 'var(--text-dim)', letterSpacing: 2 }}>
+                <div style={{ marginTop: 12, marginBottom: 6, fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-dim)', letterSpacing: 2 }}>
                   VELOCITY (AU/yr)
                 </div>
                 {['VX','VY','VZ'].map((ax, i) => (
                   <DataRow key={ax} label={ax} value={selectedBody.vel[i].toFixed(5)} />
                 ))}
                 <div style={{ marginTop: 16, paddingTop: 12, borderTop: '1px solid var(--border)' }}>
-                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: 8, color: 'var(--text-dim)', letterSpacing: 2, marginBottom: 8 }}>
+                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-dim)', letterSpacing: 2, marginBottom: 8 }}>
                     KINETIC ENERGY
                   </div>
                   <div style={{ fontFamily: 'var(--font-mono)', fontSize: 16, color: 'var(--amber)', textShadow: '0 0 10px var(--amber)' }}>
@@ -244,7 +246,7 @@ export default function SidePanel({ open, snap, selectedBody, config, log, onSen
                 </div>
               </>
             ) : (
-              <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-dim)', textAlign: 'center', marginTop: 40, lineHeight: 2 }}>
+              <div style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--text-dim)', textAlign: 'center', marginTop: 40, lineHeight: 2 }}>
                 <div style={{ fontSize: 24, marginBottom: 8 }}>◎</div>
                 Click a body to select it
               </div>
@@ -255,7 +257,7 @@ export default function SidePanel({ open, snap, selectedBody, config, log, onSen
         {/* ── SYSTEM tab ────────────────────────────────────── */}
         {tab === 'system' && (
           <div>
-            <div style={{ fontFamily: 'var(--font-mono)', fontSize: 8, color: 'var(--text-dim)', letterSpacing: 2, marginBottom: 10 }}>
+            <div style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-dim)', letterSpacing: 2, marginBottom: 10 }}>
               SIMULATION STATE
             </div>
             <DataRow label="SIM TIME"   value={`${snap.time.toFixed(3)} yr`}        color="var(--cyan)"  />
@@ -286,7 +288,7 @@ export default function SidePanel({ open, snap, selectedBody, config, log, onSen
                     </>
                   );
                 })()}
-                <div style={{ fontFamily: 'var(--font-mono)', fontSize: 8, color: 'var(--amber)', letterSpacing: 2, marginBottom: 10 }}>
+                <div style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--amber)', letterSpacing: 2, marginBottom: 10 }}>
                   SIMULATION INTEGRITY
                 </div>
                 <EnergySparkline drift={snap.diagnostics.energyDrift} />
@@ -325,7 +327,7 @@ export default function SidePanel({ open, snap, selectedBody, config, log, onSen
 
             {/* ── Physics configuration ─────────────────────────────── */}
             <div style={{ marginTop: 16, paddingTop: 12, borderTop: '1px solid var(--border)' }}>
-              <div style={{ fontFamily: 'var(--font-mono)', fontSize: 8, color: 'var(--text-dim)', letterSpacing: 2, marginBottom: 10 }}>
+              <div style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-dim)', letterSpacing: 2, marginBottom: 10 }}>
                 INTEGRATOR
               </div>
               <DataRow label="SCHEME"     value="VELOCITY VERLET + ADAPTIVE SUBSTEP" color="var(--text-mono)" />
@@ -338,7 +340,7 @@ export default function SidePanel({ open, snap, selectedBody, config, log, onSen
 
               {snap.blackHole && (
                 <div style={{ marginTop: 12, paddingTop: 10, borderTop: '1px solid var(--border)' }}>
-                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: 8, color: 'var(--purple)', letterSpacing: 2, marginBottom: 10 }}>
+                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--purple)', letterSpacing: 2, marginBottom: 10 }}>
                     BLACK HOLE ZONES
                   </div>
                   <DataRow label="EVENT HORIZON" value={fmtRadius(snap.blackHole.event_horizon_radius)} color="var(--amber)" />
@@ -352,7 +354,7 @@ export default function SidePanel({ open, snap, selectedBody, config, log, onSen
                   {/* NFW dark matter halo toggle. Gated to Galaxy Core preset initially (DD-003).
                      Toggle mid-simulation to watch the rotation curve change live. */}
                   <div style={{ marginTop: 12, paddingTop: 10, borderTop: '1px solid var(--border)' }}>
-                    <div style={{ fontFamily: 'var(--font-mono)', fontSize: 8, color: 'var(--purple)', letterSpacing: 2, marginBottom: 8 }}>
+                    <div style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--purple)', letterSpacing: 2, marginBottom: 8 }}>
                       DARK MATTER HALO (NFW)
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
@@ -364,14 +366,14 @@ export default function SidePanel({ open, snap, selectedBody, config, log, onSen
                         style={{ accentColor: 'var(--purple)', cursor: 'pointer' }}
                       />
                       <label htmlFor="halo-on" style={{
-                        fontFamily: 'var(--font-mono)', fontSize: 10,
+                        fontFamily: 'var(--font-mono)', fontSize: 13,
                         color: config.haloOn ? 'var(--purple)' : 'var(--text-dim)',
                         cursor: 'pointer',
                       }}>
                         NFW halo {config.haloOn ? '● ON — rotation curve flat' : '○ OFF — Keplerian (1/√r)'}
                       </label>
                     </div>
-                    <div style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--text-dim)', marginLeft: 20 }}>
+                    <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-dim)', marginLeft: 20 }}>
                       ρ(r) = ρₛ / [(r/rₛ)(1+r/rₛ)²] · NFW 1996/1997
                     </div>
                   </div>
@@ -380,14 +382,14 @@ export default function SidePanel({ open, snap, selectedBody, config, log, onSen
                      Image-plane mode reveals the photon sphere — b_cr = 3√3/2 · r_s. */}
                   {snap.photonsOn && (
                     <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px solid var(--border)' }}>
-                      <div style={{ fontFamily: 'var(--font-mono)', fontSize: 8, color: 'var(--cyan)', letterSpacing: 2, marginBottom: 8 }}>
+                      <div style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--cyan)', letterSpacing: 2, marginBottom: 8 }}>
                         PHOTON SPAWN MODE
                       </div>
                       <div style={{ display: 'flex', gap: 6 }}>
                         <button
                           className="mc-btn"
                           style={{
-                            fontSize: 9, flex: 1,
+                            fontSize: 11, flex: 1,
                             background: config.photonMode === 'cone' ? 'var(--cyan)' : 'transparent',
                             color: config.photonMode === 'cone' ? 'var(--bg)' : 'var(--cyan)',
                             border: '1px solid var(--cyan)',
@@ -399,7 +401,7 @@ export default function SidePanel({ open, snap, selectedBody, config, log, onSen
                         <button
                           className="mc-btn"
                           style={{
-                            fontSize: 9, flex: 1,
+                            fontSize: 11, flex: 1,
                             background: config.photonMode === 'image_plane' ? 'var(--cyan)' : 'transparent',
                             color: config.photonMode === 'image_plane' ? 'var(--bg)' : 'var(--cyan)',
                             border: '1px solid var(--cyan)',
@@ -412,10 +414,10 @@ export default function SidePanel({ open, snap, selectedBody, config, log, onSen
                       {config.photonMode === 'image_plane' && (
                         <div style={{ marginTop: 8 }}>
                           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-                            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 8, color: 'var(--text-dim)' }}>
+                            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-dim)' }}>
                               scan width (× b_cr)
                             </span>
-                            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 8, color: 'var(--cyan)' }}>
+                            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--cyan)' }}>
                               {config.imagePlaneWidth.toFixed(1)}×
                             </span>
                           </div>
@@ -425,7 +427,7 @@ export default function SidePanel({ open, snap, selectedBody, config, log, onSen
                             style={{ width: '100%', color: 'var(--cyan)' }}
                             onChange={e => onUpdateConfig({ imagePlaneWidth: Number(e.target.value) })}
                           />
-                          <div style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--text-dim)', marginTop: 2 }}>
+                          <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-dim)', marginTop: 2 }}>
                             Sweeps b from 0 → {config.imagePlaneWidth.toFixed(1)} × b_cr to reveal photon sphere
                           </div>
                         </div>
@@ -439,8 +441,8 @@ export default function SidePanel({ open, snap, selectedBody, config, log, onSen
                  at the cost of wall-clock time. Mirrors Aarseth 2003 §2.4. */}
               <div style={{ marginTop: 10 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: 8, color: 'var(--text-dim)', letterSpacing: 1 }}>η (timestep safety factor)</span>
-                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: 8, color: 'var(--cyan)' }}>{config.eta.toFixed(3)}</span>
+                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-dim)', letterSpacing: 1 }}>η (timestep safety factor)</span>
+                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--cyan)' }}>{config.eta.toFixed(3)}</span>
                 </div>
                 <input
                   type="range" min={0.005} max={0.1} step={0.005}
@@ -455,10 +457,10 @@ export default function SidePanel({ open, snap, selectedBody, config, log, onSen
                  Accurate / Standard / Fast labels match GADGET-2 conventions. */}
               <div style={{ marginTop: 10 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: 8, color: 'var(--text-dim)', letterSpacing: 1 }}>
+                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-dim)', letterSpacing: 1 }}>
                     θ (Barnes-Hut opening angle)
                   </span>
-                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: 8, color: 'var(--cyan)' }}>
+                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--cyan)' }}>
                     {config.theta.toFixed(2)}&nbsp;
                     <span style={{ color: 'var(--text-dim)' }}>
                       {config.theta <= 0.4 ? '— Accurate' : config.theta <= 0.75 ? '— Standard' : '— Fast'}
@@ -471,7 +473,7 @@ export default function SidePanel({ open, snap, selectedBody, config, log, onSen
                   style={{ width: '100%', color: 'var(--cyan)' }}
                   onChange={e => onUpdateConfig({ theta: Number(e.target.value) })}
                 />
-                <div style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--text-dim)', marginTop: 2 }}>
+                <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-dim)', marginTop: 2 }}>
                   ~1% force error at θ=0.7 · only applies when N &gt; 120 in realtime mode
                 </div>
               </div>
@@ -487,20 +489,20 @@ export default function SidePanel({ open, snap, selectedBody, config, log, onSen
                   style={{ accentColor: 'var(--cyan)', cursor: 'pointer' }}
                 />
                 <label htmlFor="virial-equil" style={{
-                  fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-dim)',
+                  fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--text-dim)',
                   cursor: 'pointer', letterSpacing: 0.5,
                 }}>
                   Virial equilibrium at spawn (Q = 1)
                 </label>
               </div>
-              <div style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--text-dim)', marginLeft: 20, marginTop: 2 }}>
+              <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-dim)', marginLeft: 20, marginTop: 2 }}>
                 Takes effect on next reset — rescales velocities so 2KE/|PE| = 1
               </div>
 
               {/* Seed field: any integer is valid; Mulberry32 mixes it well.
                  Hex input for the "0xDEADBEEF vibe" — parsed via parseInt/16. */}
               <div style={{ marginTop: 10, display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span style={{ fontFamily: 'var(--font-mono)', fontSize: 8, color: 'var(--text-dim)', letterSpacing: 1 }}>
+                <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-dim)', letterSpacing: 1 }}>
                   seed (hex)
                 </span>
                 <input
@@ -512,14 +514,14 @@ export default function SidePanel({ open, snap, selectedBody, config, log, onSen
                   }}
                   style={{
                     flex: 1, background: 'var(--bg)', border: '1px solid var(--border)',
-                    color: 'var(--cyan)', fontFamily: 'var(--font-mono)', fontSize: 10,
+                    color: 'var(--cyan)', fontFamily: 'var(--font-mono)', fontSize: 13,
                     padding: '3px 6px', borderRadius: 3, minWidth: 0,
                   }}
                 />
                 <button
                   className="mc-btn mc-btn-cyan"
                   onClick={() => onUpdateConfig({ seed: (Math.random() * 0xFFFFFFFF) >>> 0 })}
-                  style={{ fontSize: 9 }}
+                  style={{ fontSize: 11 }}
                 >
                   🎲
                 </button>
@@ -531,11 +533,11 @@ export default function SidePanel({ open, snap, selectedBody, config, log, onSen
         {/* ── LOG tab ───────────────────────────────────────── */}
         {tab === 'log' && (
           <div>
-            <div style={{ fontFamily: 'var(--font-mono)', fontSize: 8, color: 'var(--text-dim)', letterSpacing: 2, marginBottom: 10 }}>
+            <div style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-dim)', letterSpacing: 2, marginBottom: 10 }}>
               EVENT LOG
             </div>
             {log.length === 0 ? (
-              <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-dim)', marginTop: 20 }}>
+              <div style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--text-dim)', marginTop: 20 }}>
                 No events yet.
               </div>
             ) : (
@@ -548,7 +550,7 @@ export default function SidePanel({ open, snap, selectedBody, config, log, onSen
                               : 'var(--text-dim)';
                 return (
                   <div key={i} style={{
-                    fontFamily: 'var(--font-mono)', fontSize: 9,
+                    fontFamily: 'var(--font-mono)', fontSize: 11,
                     color,
                     padding: '5px 0',
                     borderBottom: '1px solid var(--border)',
@@ -565,20 +567,20 @@ export default function SidePanel({ open, snap, selectedBody, config, log, onSen
         {/* ── REC tab ───────────────────────────────────────── */}
         {tab === 'rec' && (
           <div>
-            <div style={{ fontFamily: 'var(--font-mono)', fontSize: 8, color: 'var(--text-dim)', letterSpacing: 2, marginBottom: 14 }}>
+            <div style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-dim)', letterSpacing: 2, marginBottom: 14 }}>
               RECORDING
             </div>
             <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
-              <button className="mc-btn mc-btn-green" onClick={() => onSend('toggle_recording')} style={{ fontSize: 9 }}>
+              <button className="mc-btn mc-btn-green" onClick={() => onSend('toggle_recording')} style={{ fontSize: 11 }}>
                 ⏺ RECORD
               </button>
-              <button className="mc-btn mc-btn-cyan" onClick={() => onSend('save_csv')} style={{ fontSize: 9 }}>
+              <button className="mc-btn mc-btn-cyan" onClick={() => onSend('save_csv')} style={{ fontSize: 11 }}>
                 ⬇ CSV
               </button>
             </div>
             <DataRow label="ROWS" value={String(snap.recordCount)} color="var(--cyan)" />
             <div style={{ marginTop: 16 }}>
-              <div style={{ fontFamily: 'var(--font-mono)', fontSize: 8, color: 'var(--text-dim)', letterSpacing: 2, marginBottom: 8 }}>
+              <div style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-dim)', letterSpacing: 2, marginBottom: 8 }}>
                 SAMPLE INTERVAL
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -594,10 +596,10 @@ export default function SidePanel({ open, snap, selectedBody, config, log, onSen
               </div>
             </div>
             <div style={{ marginTop: 20, padding: 10, background: 'var(--bg)', borderRadius: 4, border: '1px solid var(--border)' }}>
-              <div style={{ fontFamily: 'var(--font-mono)', fontSize: 8, color: 'var(--text-dim)', letterSpacing: 2, marginBottom: 6 }}>
+              <div style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-dim)', letterSpacing: 2, marginBottom: 6 }}>
                 STATUS
               </div>
-              <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: snap.recordCount > 0 ? 'var(--green)' : 'var(--text-dim)' }}>
+              <div style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color: snap.recordCount > 0 ? 'var(--green)' : 'var(--text-dim)' }}>
                 {snap.recordCount > 0 ? `● Recording — ${snap.recordCount} rows` : 'Idle — 0 rows'}
               </div>
             </div>
@@ -605,6 +607,6 @@ export default function SidePanel({ open, snap, selectedBody, config, log, onSen
         )}
 
       </div>
-    </div>
+    </motion.div>
   );
 }

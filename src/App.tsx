@@ -1,4 +1,5 @@
 import { useRef, useState, useCallback } from 'react';
+import { motion } from 'framer-motion';
 import { INITIAL_STATE } from './types';
 import type { SimState } from './types';
 import { useSimulation } from './hooks/useSimulation';
@@ -7,6 +8,7 @@ import SimCanvas    from './components/SimCanvas';
 import HUD          from './components/HUD';
 import ControlStrip from './components/ControlStrip';
 import SidePanel    from './components/SidePanel';
+import UserGuide    from './components/UserGuide';
 
 export default function App() {
   // Shared state ref — updated at 60fps by the worker, read by Three.js render loop
@@ -17,6 +19,7 @@ export default function App() {
 
   // UI state (low-frequency React state)
   const [sidePanelOpen, setSidePanelOpen] = useState(false);
+  const [guideOpen,     setGuideOpen]     = useState(false);
   const [selectedBodyIndex, setSelectedBodyIndex] = useState<number | null>(null);
   const [trailsOn, setTrailsOn] = useState(true);
   const [gridOn,   setGridOn]   = useState(false);
@@ -56,7 +59,11 @@ export default function App() {
         running={uiSnap.running}
         gpuActive={uiSnap.gpuActive}
         sidePanelOpen={sidePanelOpen}
+        time={uiSnap.time}
+        bodyCount={uiSnap.bodyCount}
+        energy={uiSnap.energy}
         onToggleSidePanel={() => setSidePanelOpen(o => !o)}
+        onToggleGuide={() => setGuideOpen(o => !o)}
         onPreset={applyPreset}
       />
 
@@ -97,33 +104,64 @@ export default function App() {
           zIndex: 25,
           boxShadow: '0 18px 44px rgba(0,0,0,0.35)',
         }}>
-          <TabIcon
-            active={sidePanelOpen}
-            title="Telemetry"
-            onClick={() => setSidePanelOpen(o => !o)}
-          >◉</TabIcon>
-          <TabIcon
-            active={gridOn}
-            title="Grid"
-            onClick={() => setGridOn(v => !v)}
-          >⊞</TabIcon>
-          <TabIcon
-            active={trailsOn}
-            title="Trails"
-            onClick={handleToggleTrails}
-          >∿</TabIcon>
+          <TabIcon active={sidePanelOpen} title="Telemetry" onClick={() => setSidePanelOpen(o => !o)}>◉</TabIcon>
+          <TabIcon active={gridOn}        title="Grid"      onClick={() => setGridOn(v => !v)}>⊞</TabIcon>
+          <TabIcon active={trailsOn}      title="Trails"    onClick={handleToggleTrails}>∿</TabIcon>
         </div>
 
-        {/* Side panel (slides in over canvas) */}
-        <SidePanel
-          open={sidePanelOpen}
-          snap={uiSnap}
-          selectedBody={selectedBody}
-          config={config}
-          log={log}
-          onSend={send}
-          onUpdateConfig={updateConfig}
-        />
+        {/* Clip container for side panel — overflow:hidden here prevents
+            backdropFilter from escaping the canvas area when panel is closed */}
+        <div style={{
+          position: 'absolute', right: 42, top: 0, bottom: 0, width: 380,
+          overflow: 'hidden', zIndex: 20,
+          pointerEvents: sidePanelOpen ? 'auto' : 'none',
+        }}>
+          <SidePanel
+            open={sidePanelOpen}
+            snap={uiSnap}
+            selectedBody={selectedBody}
+            config={config}
+            log={log}
+            onSend={send}
+            onUpdateConfig={updateConfig}
+          />
+        </div>
+
+        {/* User guide (slides in from left) */}
+        <UserGuide open={guideOpen} onClose={() => setGuideOpen(false)} />
+
+        {/* Floating guide button (bottom-left, visible when guide is closed) */}
+        {!guideOpen && (
+          <motion.button
+            onClick={() => setGuideOpen(true)}
+            whileHover={{ scale: 1.08 }}
+            whileTap={{ scale: 0.93 }}
+            title="Open User Guide"
+            style={{
+              position: 'absolute', bottom: 16, left: 16, zIndex: 20,
+              width: 42, height: 42, borderRadius: '50%',
+              background: 'rgba(5,9,20,0.82)',
+              backdropFilter: 'blur(10px)',
+              border: '1px solid var(--border-bright)',
+              color: 'var(--text-dim)',
+              fontFamily: 'var(--font-mono)', fontSize: 18, fontWeight: 700,
+              cursor: 'pointer',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              boxShadow: '0 4px 20px rgba(0,0,0,0.4)',
+              transition: 'border-color 0.2s, color 0.2s',
+            }}
+            onMouseEnter={e => {
+              (e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--cyan)';
+              (e.currentTarget as HTMLButtonElement).style.color = 'var(--cyan)';
+            }}
+            onMouseLeave={e => {
+              (e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--border-bright)';
+              (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-dim)';
+            }}
+          >
+            ?
+          </motion.button>
+        )}
       </div>
 
       {/* ── Control strip ────────────────────────────────────── */}

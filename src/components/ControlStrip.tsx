@@ -71,7 +71,7 @@ const MODE_LABELS: Record<IntegratorMode, string> = {
 function SectionLabel({ text }: { text: string }) {
   return (
     <span style={{
-      fontFamily: 'var(--font-mono)', fontSize: 12, letterSpacing: 1.6,
+      fontFamily: 'var(--font-mono)', fontSize: 13, letterSpacing: 1.6,
       color: 'var(--text-dim)', textTransform: 'uppercase',
       writingMode: 'horizontal-tb', flexShrink: 0, marginRight: 2,
       paddingRight: 6, borderRight: '1px solid var(--border)',

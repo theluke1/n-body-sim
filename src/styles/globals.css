@@ -167,7 +167,7 @@ input[type="range"]::-moz-range-thumb {
 /* ── Section label ──────────────────────────────────────────── */
 .mc-label {
   font-family: var(--font-mono);
-  font-size: 12px;
+  font-size: 13px;
   letter-spacing: 2px;
   text-transform: uppercase;
   color: var(--text-dim);
@@ -176,7 +176,7 @@ input[type="range"]::-moz-range-thumb {
 /* ── Mono value display ─────────────────────────────────────── */
 .mc-value {
   font-family: var(--font-mono);
-  font-size: 13px;
+  font-size: 14px;
   color: var(--text-mono);
   min-width: 44px;
   text-align: right;
